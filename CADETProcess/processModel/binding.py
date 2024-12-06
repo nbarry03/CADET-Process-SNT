@@ -552,10 +552,10 @@ class ExtendedMobilePhaseModulator(BindingBaseClass):
         Desorption rate constants. Length depends on `n_comp`.
     capacity : list of unsigned floats.
         Maximum adsorption capacities. Length depends on `n_comp`.
-    ion_exchange_characteristic : list of unsigned floats.
+    ion_exchange_characteristic : list of floats.
         Parameters describing the ion-exchange characteristics (IEX).
         Length depends on `n_comp`.
-    hydrophobicity : list of unsigned floats.
+    hydrophobicity : list of floats.
         Parameters describing the hydrophobicity (HIC).
         Length depends on `n_comp`.
     component_mode : list of unsigned integers.
@@ -570,9 +570,9 @@ class ExtendedMobilePhaseModulator(BindingBaseClass):
     adsorption_rate = SizedUnsignedList(size='n_comp')
     desorption_rate = SizedUnsignedList(size='n_comp')
     capacity = SizedUnsignedList(size='n_comp')
-    ion_exchange_characteristic = SizedUnsignedList(size='n_comp')
+    ion_exchange_characteristic = SizedList(size='n_comp')
     beta = ion_exchange_characteristic
-    hydrophobicity = SizedUnsignedList(size='n_comp')
+    hydrophobicity = SizedList(size='n_comp')
     gamma = hydrophobicity
     component_mode = SizedUnsignedIntegerList(size='n_comp', ub=2)
 
