@@ -556,6 +556,7 @@ class ExtendedMobilePhaseModulator(BindingBaseClass):
         Parameters describing the ion-exchange characteristics (IEX).
         Length depends on `n_comp`.
     hydrophobicity : list of floats.
+    hydrophobicity : list of floats.
         Parameters describing the hydrophobicity (HIC).
         Length depends on `n_comp`.
     component_mode : list of unsigned integers.
