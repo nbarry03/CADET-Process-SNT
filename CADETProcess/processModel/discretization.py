@@ -352,6 +352,7 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     spatial_method = Constant(value='FV')
     ncol = UnsignedInteger(default=100)
     npar = UnsignedList()
+    # npar = SizedUnsignedIntegerList(size='particle_radius_length', default=5)     # TODO: Does this need default value and size?
 
     par_geom = Switch(
         default='SPHERE',
@@ -398,7 +399,6 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
         """int: Number of entries in the particle discretization vector."""
         return sum([n + 1 for n in self.npar])
     
-    # TODO: This would define size of list, is this required?
     # @property
     # def particle_radius_length(self):
     #     """int: Number of entries in the particle."""
