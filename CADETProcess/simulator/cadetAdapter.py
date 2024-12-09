@@ -1210,6 +1210,7 @@ unit_parameters_map = {
             'PORE_ACCESSIBILITY': 'pore_accessibility',
             'PAR_DIFFUSION': 'pore_diffusion',
             'PAR_SURFDIFFUSION': 'surface_diffusion',
+            'PAR_TYPE_VOLFRAC': 'par_type_volfrac',
             'CROSS_SECTION_AREA': 'cross_section_area',
             'VELOCITY': 'flow_direction',
         },
