@@ -352,7 +352,6 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     spatial_method = Constant(value='FV')
     ncol = UnsignedInteger(default=100)
     npar = UnsignedList()
-    # npar = SizedUnsignedIntegerList(size='particle_radius_length', default=5)     # TODO: Does this need default value and size?
 
     par_geom = Switch(
         default='SPHERE',

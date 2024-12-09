@@ -963,7 +963,7 @@ class GeneralRateModel(TubularReactorBase):
     particle_radius : UnsignedList.
         List of radii of the particles.
     film_diffusion : List of unsigned floats. Length depends on n_comp.
-        Diffusion rate for components in pore volume.
+        Film diffusion coefficients for each component.
     par_type_volfrac: List of unsigned floats. Length depends on number of particle radii.
         Volume fractions of the particle types.
     pore_accessibility : List of unsigned floats. Length depends on n_comp.
@@ -996,9 +996,20 @@ class GeneralRateModel(TubularReactorBase):
     pore_diffusion = SizedUnsignedList(size='n_comp')
     _surface_diffusion = SizedUnsignedList(size='n_bound_states')
     _parameters = [
-        'bed_porosity', 'particle_porosity', 'particle_radius',
-        'par_type_volfrac', 'film_diffusion', 'pore_accessibility',
-        'pore_diffusion', 'surface_diffusion'
+        "bed_porosity",
+        "particle_porosity",
+        "particle_radius",
+        "par_type_volfrac",
+        "film_diffusion",
+        "pore_accessibility",
+        "pore_diffusion",
+        "surface_diffusion",
+    ]
+    _section_dependent_parameters = TubularReactorBase._section_dependent_parameters + [
+        "film_diffusion",
+        "pore_accessibility",
+        "pore_diffusion",
+        "surface_diffusion",
     ]
     _section_dependent_parameters = \
         TubularReactorBase._section_dependent_parameters + \

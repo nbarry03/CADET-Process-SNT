@@ -1194,25 +1194,25 @@ class ModelSolverParameters(Structure):
 
 
 unit_parameters_map = {
-    'GeneralRateModel': {
-        'name': 'GENERAL_RATE_MODEL',
-        'parameters': {
-            'NCOMP': 'n_comp',
-            'INIT_C': 'c',
-            'INIT_Q': 'q',
-            'INIT_CP': 'cp',
-            'COL_DISPERSION': 'axial_dispersion',
-            'COL_LENGTH': 'length',
-            'COL_POROSITY': 'bed_porosity',
-            'FILM_DIFFUSION': 'film_diffusion',
-            'PAR_POROSITY': 'particle_porosity',
-            'PAR_RADIUS': 'particle_radius',
-            'PORE_ACCESSIBILITY': 'pore_accessibility',
-            'PAR_DIFFUSION': 'pore_diffusion',
-            'PAR_SURFDIFFUSION': 'surface_diffusion',
-            'PAR_TYPE_VOLFRAC': 'par_type_volfrac',
-            'CROSS_SECTION_AREA': 'cross_section_area',
-            'VELOCITY': 'flow_direction',
+    "GeneralRateModel": {
+        "name": "GENERAL_RATE_MODEL",
+        "parameters": {
+            "NCOMP": "n_comp",
+            "INIT_C": "c",
+            "INIT_Q": "q",
+            "INIT_CP": "cp",
+            "COL_DISPERSION": "axial_dispersion",
+            "COL_LENGTH": "length",
+            "COL_POROSITY": "bed_porosity",
+            "FILM_DIFFUSION": "film_diffusion",
+            "PAR_POROSITY": "particle_porosity",
+            "PAR_RADIUS": "particle_radius",
+            "PORE_ACCESSIBILITY": "pore_accessibility",
+            "PAR_DIFFUSION": "pore_diffusion",
+            "PAR_SURFDIFFUSION": "surface_diffusion",
+            'PAR_TYPE_VOLFRAC': "par_type_volfrac",
+            "CROSS_SECTION_AREA": "cross_section_area",
+            "VELOCITY": "flow_direction",
         },
         'fixed': {
             'PAR_SURFDIFFUSION_MULTIPLEX': 0,
