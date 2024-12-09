@@ -1067,10 +1067,12 @@ class GeneralRateModel(ChromatographicColumnBase):
         Porosity of the bed
     particle_porosity : UnsignedFloat between 0 and 1.
         Porosity of particles.
-    particle_radius : UnsignedFloat
-        Radius of the particles.
+    particle_radius : UnsignedList.
+        List of radii of the particles.
     film_diffusion : List of unsigned floats. Length depends on n_comp.
         Film diffusion coefficients for each component.
+    par_type_volfrac: List of unsigned floats. Length depends on number of particle radii.
+        Volume fractions of the particle types.
     pore_accessibility : List of unsigned floats. Length depends on n_comp.
         Accessibility of pores for components.
     pore_diffusion : List of unsigned floats. Length depends on n_comp.
@@ -1094,15 +1096,17 @@ class GeneralRateModel(ChromatographicColumnBase):
 
     bed_porosity = UnsignedFloat(ub=1)
     particle_porosity = UnsignedFloat(ub=1)
-    particle_radius = UnsignedFloat()
-    film_diffusion = SizedUnsignedList(size="n_comp")
-    pore_accessibility = SizedUnsignedList(ub=1, size="n_comp", default=1)
-    pore_diffusion = SizedUnsignedList(size="n_comp")
-    _surface_diffusion = SizedUnsignedList(size="n_bound_states")
+    particle_radius = UnsignedList()
+    par_type_volfrac = UnsignedList(ub=1)
+    film_diffusion = SizedUnsignedList(size='n_comp')
+    pore_accessibility = SizedUnsignedList(ub=1, size='n_comp', default=1)
+    pore_diffusion = SizedUnsignedList(size='n_comp')
+    _surface_diffusion = SizedUnsignedList(size='n_bound_states')
     _parameters = [
         "bed_porosity",
         "particle_porosity",
         "particle_radius",
+        "par_type_volfrac",
         "film_diffusion",
         "pore_accessibility",
         "pore_diffusion",
