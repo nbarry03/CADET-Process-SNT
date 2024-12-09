@@ -428,6 +428,7 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
         """int: Number of entries in the particle discretization vector."""
         return sum([n + 1 for n in self.npar])
     
+    # TODO: This would define size of list, is this required?
     # @property
     # def particle_radius_length(self):
     #     """int: Number of entries in the particle."""
