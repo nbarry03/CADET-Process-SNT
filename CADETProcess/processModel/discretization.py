@@ -16,7 +16,7 @@ from CADETProcess.dataStructure import Structure, frozen_attributes
 from CADETProcess.dataStructure import (
     Constant, Bool, Switch,
     RangedInteger, UnsignedInteger, UnsignedFloat,
-    SizedRangedList, UnsignedList
+    SizedRangedList, UnsignedList, SizedUnsignedIntegerList
 )
 
 
@@ -352,6 +352,7 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     spatial_method = Constant(value='FV')
     ncol = UnsignedInteger(default=100)
     npar = UnsignedList()
+    # npar = SizedUnsignedIntegerList(size='particle_radius_length', default=5)     # TODO: Does this need default value and size?
 
     par_geom = Switch(
         default='SPHERE',
@@ -396,8 +397,13 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     @property
     def par_disc_vector_length(self):
         """int: Number of entries in the particle discretization vector."""
-        return self.npar + 1
-
+        return sum([n + 1 for n in self.npar])
+    
+    # @property
+    # def particle_radius_length(self):
+    #     """int: Number of entries in the particle."""
+    #     # return len(self.particle_radius)
+    #     return 5
 
 class GRMDiscretizationDG(DGMixin):
     """Discretization parameters of the DG version of the GRM.
