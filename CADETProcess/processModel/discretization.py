@@ -16,7 +16,7 @@ from CADETProcess.dataStructure import Structure, frozen_attributes
 from CADETProcess.dataStructure import (
     Constant, Bool, Switch,
     RangedInteger, UnsignedInteger, UnsignedFloat,
-    SizedRangedList
+    SizedRangedList, UnsignedList
 )
 
 
@@ -295,8 +295,8 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     ----------
     ncol : UnsignedInteger, optional
         Number of axial column discretization cells. Default is 100.
-    npar : UnsignedInteger, optional
-        Number of discretization cells in the radial direction. Default is 5.
+    npar : UnsignedList, optional
+        List of number of discretization cells in the radial direction.
     par_geom : Switch, optional
         The geometry of the particles in the model.
         Valid values are 'SPHERE', 'CYLINDER', and 'SLAB'.
@@ -351,7 +351,7 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
 
     spatial_method = Constant(value='FV')
     ncol = UnsignedInteger(default=100)
-    npar = UnsignedInteger(default=5)
+    npar = UnsignedList()
 
     par_geom = Switch(
         default='SPHERE',
