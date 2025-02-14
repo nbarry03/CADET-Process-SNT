@@ -510,7 +510,7 @@ class Cadet(SimulatorBase):
                                     unit.name,
                                     unit.component_system,
                                     time,
-                                    sol_volume
+                                    sol_volume.flatten()
                                 )
                             )
                         start = end - 1
