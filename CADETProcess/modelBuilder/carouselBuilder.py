@@ -253,38 +253,40 @@ class CarouselBuilder(Structure):
     def _add_units(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add units to flow_sheet."""
         col_index = 0
+
+        def add_zone(zone: ZoneBaseClass):
+            nonlocal col_index
+            # Add zone inlet/outlet units
+            flow_sheet.add_unit(zone.inlet_unit)
+            flow_sheet.add_unit(zone.outlet_unit)
+            for i_col in range(zone.n_columns):
+                cols = deepcopy(self.column)
+                # Handle single unit column template
+                if not isinstance(cols, list):
+                    cols = [cols]
+                n_col_subunits = len(cols)
+                for col in cols:
+                    col.component_system = self.component_system
+                    col.name = f'column_{col.name + '_' if n_col_subunits > 1 else ''}{col_index}'
+                    if zone.initial_state is not None:
+                        col.initial_state = zone.initial_state[i_col]
+                    flow_sheet.add_unit(col)
+                col_index += 1
+        
         for unit in self.flow_sheet.units:
+            # Not column zone unit
             if not isinstance(unit, ZoneBaseClass):
-                is_feed_inlet = unit in self.flow_sheet.feed_inlets
-                is_eluent_inlet = unit in self.flow_sheet.eluent_inlets
-                is_output_outlet = unit in self.flow_sheet.product_outlets
-                flow_sheet.add_unit(
-                    unit,
-                    feed_inlet=is_feed_inlet,
-                    eluent_inlet=is_eluent_inlet,
-                    product_outlet=is_output_outlet,
-                )
+                # Aggregate inlet/outlet kwargs
+                flags = {
+                    'feed_inlet': unit in self.flow_sheet.feed_inlets,
+                    'eluent_inlet': unit in self.flow_sheet.eluent_inlets,
+                    'product_outlet': unit in self.flow_sheet.product_outlets
+                }
+                flow_sheet.add_unit(unit, **flags)
+
+            # Column zone unit
             else:
-                flow_sheet.add_unit(unit.inlet_unit)
-                flow_sheet.add_unit(unit.outlet_unit)
-                for i_col in range(unit.n_columns):
-                    col = deepcopy(self.column)
-                    # Handle multi-unit column template
-                    if isinstance(col, list):
-                        for col_sub in col:
-                            col_sub.component_system = self.component_system
-                            col_sub.name = f'column_{col_sub.name}_{col_index}'
-                            if unit.initial_state is not None:
-                                print('Initial state is not None', unit)
-                                col_sub.initial_state = unit.initial_state[i_col]
-                            flow_sheet.add_unit(col_sub)
-                    else:
-                        col.component_system = self.component_system
-                        col.name = f'column_{col_index}'
-                        if unit.initial_state is not None:
-                            col.initial_state = unit.initial_state[i_col]
-                        flow_sheet.add_unit(col)
-                    col_index += 1
+                add_zone(unit)
 
     def _add_inter_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections between zones."""
