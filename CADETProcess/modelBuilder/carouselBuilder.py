@@ -175,10 +175,10 @@ class CarouselBuilder(Structure):
 
     @column.setter
     def column(self, column: TubularReactorBase) -> NoReturn:
-        if not isinstance(column, TubularReactorBase):
-            raise TypeError("Column must be an instance of TubularReactorBase.")
-        if self.component_system is not column.component_system:
-            raise CADETProcessError('Number of components does not match.')
+        # if not isinstance(column, TubularReactorBase):
+        #     raise TypeError("Column must be an instance of TubularReactorBase.")
+        # if self.component_system is not column.component_system:
+        #     raise CADETProcessError('Number of components does not match.')
         self._column = column
 
     @wraps(FlowSheet.add_unit)
@@ -269,11 +269,21 @@ class CarouselBuilder(Structure):
                 flow_sheet.add_unit(unit.outlet_unit)
                 for i_col in range(unit.n_columns):
                     col = deepcopy(self.column)
-                    col.component_system = self.component_system
-                    col.name = f'column_{col_index}'
-                    if unit.initial_state is not None:
-                        col.initial_state = unit.initial_state[i_col]
-                    flow_sheet.add_unit(col)
+                    # Handle multi-unit column template
+                    if isinstance(col, list):
+                        for col_sub in col:
+                            col_sub.component_system = self.component_system
+                            col_sub.name = f'column_{col_sub.name}_{col_index}'
+                            if unit.initial_state is not None:
+                                print('Initial state is not None', unit)
+                                col_sub.initial_state = unit.initial_state[i_col]
+                            flow_sheet.add_unit(col_sub)
+                    else:
+                        col.component_system = self.component_system
+                        col.name = f'column_{col_index}'
+                        if unit.initial_state is not None:
+                            col.initial_state = unit.initial_state[i_col]
+                        flow_sheet.add_unit(col)
                     col_index += 1
 
     def _add_inter_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
