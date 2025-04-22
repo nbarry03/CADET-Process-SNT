@@ -357,19 +357,26 @@ class CarouselBuilder(Structure):
             flow_sheet.add_unit(zone.inlet_unit)
             flow_sheet.add_unit(zone.outlet_unit)
             for i_col in range(zone.n_columns):
-                col_subunits = deepcopy(self.column)
-                n_col_subunits = len(col_subunits)
+                # Store subunits for easier structured access
+                subunits = []
+
                 # Add column subunits
-                for subunit in col_subunits:
-                    subunit.component_system = self.component_system
-                    subunit.name = (
+                for sub in deepcopy(self.column):
+                    sub.component_system = self.component_system
+                    sub.name = (
                         f"column_"
-                        f"{subunit.name + '_' if n_col_subunits > 1 else ''}"
+                        f"{sub.name + '_' if len(self.column) > 1 else ''}"
                         f"{col_index}"
                         )
                     if zone.initial_state is not None:
-                        subunit.initial_state = zone.initial_state[i_col]
-                    flow_sheet.add_unit(subunit)
+                        sub.initial_state = zone.initial_state[i_col]
+                    flow_sheet.add_unit(sub)
+                    subunits.append(sub)
+
+                # Aggregate Column objects
+                self._columns.append(
+                    Column(index = col_index, subunits = subunits)
+                )
                 col_index += 1
 
         for unit in self.flow_sheet.units:
@@ -403,40 +410,50 @@ class CarouselBuilder(Structure):
 
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections within column template and within zones."""
+        # Connect subunits within each column
+        for col in self._columns:
+            for upstream, downstream in zip(col.subunits, col.subunits[1:]):
+                flow_sheet.add_connection(upstream, downstream)
 
-        for col_index in range(self.n_columns):
-            # Connect column subunits
-            top_subunit_name = None
-            prev_subunit_name = None
-            for subunit in self.column:
-                subunit_name = (
-                        f"column_"
-                        f"{subunit.name + '_' if len(self.column) > 1 else ''}"
-                        f"{col_index}"
-                        )
+        # Connect zone inlets/outlets to column tops/bottoms respectively
+        for zone in self.zones:
+            for col in self._columns:
+                    flow_sheet.add_connection(zone.inlet_unit, col.top)
+                    flow_sheet.add_connection(col.bottom, zone.outlet_unit)
+
+
+            # # Connect column subunits
+            # top_subunit_name = None
+            # prev_subunit_name = None
+            # for subunit in self.column:
+            #     subunit_name = (
+            #             f"column_"
+            #             f"{subunit.name + '_' if len(self.column) > 1 else ''}"
+            #             f"{col_index}"
+            #             )
                 
-                # Store first subunit (i.e. top of column) and move to next
-                if prev_subunit_name is None:
-                    top_subunit_name = subunit_name
+            #     # Store first subunit (i.e. top of column) and move to next
+            #     if prev_subunit_name is None:
+            #         top_subunit_name = subunit_name
 
-                # Otherwise connect previous subunit to current subunit
-                else:
-                    flow_sheet.add_connection(
-                        flow_sheet[prev_subunit_name],
-                        flow_sheet[subunit_name]
-                    )
-                prev_subunit_name = subunit_name
+            #     # Otherwise connect previous subunit to current subunit
+            #     else:
+            #         flow_sheet.add_connection(
+            #             flow_sheet[prev_subunit_name],
+            #             flow_sheet[subunit_name]
+            #         )
+            #     prev_subunit_name = subunit_name
             
-            # Connect top and bottom subunits to each zone inlet/outlet respectively
-            for zone in self.zones:
-                flow_sheet.add_connection(
-                    zone.inlet_unit,
-                    flow_sheet[top_subunit_name]
-                )
-                flow_sheet.add_connection(
-                    flow_sheet[prev_subunit_name],  # equal to last subunit on last iteration
-                    zone.outlet_unit
-                )
+            # # Connect top and bottom subunits to each zone inlet/outlet respectively
+            # for zone in self.zones:
+            #     flow_sheet.add_connection(
+            #         zone.inlet_unit,
+            #         flow_sheet[top_subunit_name]
+            #     )
+            #     flow_sheet.add_connection(
+            #         flow_sheet[prev_subunit_name],  # equal to last subunit on last iteration
+            #         zone.outlet_unit
+            #     )
 
     def _set_output_states(self, flow_sheet: FlowSheet) -> NoReturn:
         for unit in self.flow_sheet.output_states:
