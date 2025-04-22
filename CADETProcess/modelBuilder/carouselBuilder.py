@@ -53,7 +53,7 @@ class Column:
     def bottom(self) -> TubularReactorBase:
         return self.subunits[-1]
      
-
+     
 class ZoneBaseClass(UnitBaseClass):
     """Base class for a multi-column zone with configurable columns and flow directions.
 
@@ -184,8 +184,8 @@ class CarouselBuilder(Structure):
         self.component_system = component_system
         self.name = name
         self._flow_sheet = FlowSheet(component_system, name)
-        self._column = None
-        self._columns: List[Column] = []
+        self._column:List[Column] = []
+        self.valve_parameters = valve_parameters
 
     @property
     def flow_sheet(self) -> FlowSheet:
