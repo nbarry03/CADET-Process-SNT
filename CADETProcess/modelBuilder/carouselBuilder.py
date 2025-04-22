@@ -1,7 +1,7 @@
 import warnings
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Optional, NoReturn, List
+from typing import Any, Optional, NoReturn, List, Tuple, Iterable
 import warnings
 
 import matplotlib.pyplot as plt
@@ -246,7 +246,8 @@ class CarouselBuilder(Structure):
         self.component_system = component_system
         self.name = name
         self._flow_sheet = FlowSheet(component_system, name)
-        self._column:List[Column] = []
+        self._column = None
+        self._columns: List[Column] = []
         self.valve_parameters = valve_parameters
 
     @property
@@ -255,18 +256,18 @@ class CarouselBuilder(Structure):
         return self._flow_sheet
 
     @property
-    def column(self) -> List[TubularReactorBase]:
-        """List[TubularReactorBase]: The column template for all zones."""
+    def column(self) -> Tuple[TubularReactorBase, ...]:
+        """Tuple[TubularReactorBase]: The column template for all zones."""
         return self._column
 
     @column.setter
-    def column(self, column: TubularReactorBase | List[TubularReactorBase]) -> NoReturn:
+    def column(self, column: TubularReactorBase | Iterable[TubularReactorBase]) -> NoReturn:
         if isinstance(column, TubularReactorBase):
-            column = [column]
-        elif isinstance(column, (list, tuple)) and all(
-            isinstance(c, TubularReactorBase) for c in column
+            column = (column,)
+        elif (isinstance(column, Iterable)
+              and all(isinstance(c, TubularReactorBase) for c in column)
         ):
-            column = list(column)
+            column = tuple(column)
         else:
             raise TypeError("Column must be an instance or list of TubularReactorBase.")
         for col in column:
@@ -274,6 +275,7 @@ class CarouselBuilder(Structure):
                 raise CADETProcessError("Number of components does not match.")
 
         self._column = column
+        self._columns.clear()
 
     @wraps(FlowSheet.add_unit)
     def add_unit(self, *args: Any, **kwargs: Any) -> None:
