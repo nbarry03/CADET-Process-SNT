@@ -1,6 +1,6 @@
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Optional, NoReturn, List, Tuple, Iterable
+from typing import Any, Optional, NoReturn, List
 import warnings
 
 import numpy as np
@@ -193,8 +193,8 @@ class CarouselBuilder(Structure):
         return self._flow_sheet
 
     @property
-    def column(self) -> Tuple[TubularReactorBase, ...]:
-        """Tuple[TubularReactorBase]: The column template for all zones."""
+    def column(self) -> List[TubularReactorBase]:
+        """List[TubularReactorBase]: The column template for all zones."""
         return self._column
     
     @property
@@ -202,11 +202,19 @@ class CarouselBuilder(Structure):
         return self._columns
 
     @column.setter
-    def column(self, column: TubularReactorBase) -> NoReturn:
-        # if not isinstance(column, TubularReactorBase):
-        #     raise TypeError("Column must be an instance of TubularReactorBase.")
-        # if self.component_system is not column.component_system:
-        #     raise CADETProcessError('Number of components does not match.')
+    def column(self, column: TubularReactorBase | List[TubularReactorBase]) -> NoReturn:
+        if isinstance(column, TubularReactorBase):
+            column = [column]
+        elif isinstance(column, (list, tuple)) and all(
+            isinstance(c, TubularReactorBase) for c in column
+        ):
+            column = list(column)
+        else:
+            raise TypeError("Column must be an instance or list of TubularReactorBase.")
+        for col in column:
+            if col.component_system is not self.component_system:
+                raise CADETProcessError("Number of components does not match.")
+
         self._column = column
         self._columns.clear()
 
@@ -289,27 +297,29 @@ class CarouselBuilder(Structure):
             flow_sheet.add_unit(zone.inlet_unit)
             flow_sheet.add_unit(zone.outlet_unit)
             for i_col in range(zone.n_columns):
-                cols = deepcopy(self.column)
-                # Handle single unit column template
-                if not isinstance(cols, list):
-                    cols = [cols]
-                n_col_subunits = len(cols)
-                for col in cols:
-                    col.component_system = self.component_system
-                    col.name = f'column_{col.name + '_' if n_col_subunits > 1 else ''}{col_index}'
+                col_subunits = deepcopy(self.column)
+                n_col_subunits = len(col_subunits)
+                # Add column subunits
+                for subunit in col_subunits:
+                    subunit.component_system = self.component_system
+                    subunit.name = (
+                        f"column_"
+                        f"{subunit.name + '_' if n_col_subunits > 1 else ''}"
+                        f"{col_index}"
+                        )
                     if zone.initial_state is not None:
-                        col.initial_state = zone.initial_state[i_col]
-                    flow_sheet.add_unit(col)
+                        subunit.initial_state = zone.initial_state[i_col]
+                    flow_sheet.add_unit(subunit)
                 col_index += 1
-        
+
         for unit in self.flow_sheet.units:
             # Not column zone unit
             if not isinstance(unit, ZoneBaseClass):
                 # Aggregate inlet/outlet kwargs
                 flags = {
-                    'feed_inlet': unit in self.flow_sheet.feed_inlets,
-                    'eluent_inlet': unit in self.flow_sheet.eluent_inlets,
-                    'product_outlet': unit in self.flow_sheet.product_outlets
+                    "feed_inlet": unit in self.flow_sheet.feed_inlets,
+                    "eluent_inlet": unit in self.flow_sheet.eluent_inlets,
+                    "product_outlet": unit in self.flow_sheet.product_outlets,
                 }
                 flow_sheet.add_unit(unit, **flags)
 
@@ -331,15 +341,42 @@ class CarouselBuilder(Structure):
 
                     flow_sheet.add_connection(origin, destination)
 
-        for zone in self.zones:
-            output_state = self.flow_sheet.output_states[zone]
-            flow_sheet.set_output_state(zone.outlet_unit, output_state)
+    def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """Add connections within column template and within zones."""
 
-    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
-        """Add simple ring connection: col.bottom -> col.top."""
-        cols = self._columns
-        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
-            flow_sheet.add_connection(this_col.bottom, next_col.top)
+        for col_index in range(self.n_columns):
+            # Connect column subunits
+            top_subunit_name = None
+            prev_subunit_name = None
+            for subunit in self.column:
+                subunit_name = (
+                        f"column_"
+                        f"{subunit.name + '_' if len(self.column) > 1 else ''}"
+                        f"{col_index}"
+                        )
+                
+                # Store first subunit (i.e. top of column) and move to next
+                if prev_subunit_name is None:
+                    top_subunit_name = subunit_name
+
+                # Otherwise connect previous subunit to current subunit
+                else:
+                    flow_sheet.add_connection(
+                        flow_sheet[prev_subunit_name],
+                        flow_sheet[subunit_name]
+                    )
+                prev_subunit_name = subunit_name
+            
+            # Connect top and bottom subunits to each zone inlet/outlet respectively
+            for zone in self.zones:
+                flow_sheet.add_connection(
+                    zone.inlet_unit,
+                    flow_sheet[top_subunit_name]
+                )
+                flow_sheet.add_connection(
+                    flow_sheet[prev_subunit_name],  # equal to last subunit on last iteration
+                    zone.outlet_unit
+                )
 
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections within column template and within zones."""
