@@ -29,6 +29,29 @@ __all__ = [
     "LangmuirSMBBuilder",
 ]
 
+class Column:
+    def __init__(self, index: int, subunits: List[TubularReactorBase]) -> NoReturn:
+        """
+        Initialize a Column instance.
+
+        Parameters
+        ----------
+        index : int
+            Column index number.
+        subunits : List[TubularReactorBase]
+            List of column subunits that comprise the column.
+        """
+        self.index = index
+        self.subunits = subunits
+    
+    @property
+    def top(self) -> TubularReactorBase:
+        return self.subunits[0]
+    
+    @property
+    def bottom(self) -> TubularReactorBase:
+        return self.subunits[-1]
+     
 
 class ZoneBaseClass(UnitBaseClass):
     """Base class for a multi-column zone with configurable columns and flow directions.
@@ -160,7 +183,7 @@ class CarouselBuilder(Structure):
         self.component_system = component_system
         self.name = name
         self._flow_sheet = FlowSheet(component_system, name)
-        self._column = None
+        self._column:List[Column] = []
 
     @property
     def flow_sheet(self) -> FlowSheet:
