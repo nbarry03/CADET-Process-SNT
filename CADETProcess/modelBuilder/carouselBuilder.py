@@ -360,40 +360,6 @@ class CarouselBuilder(Structure):
                     flow_sheet.add_connection(zone.inlet_unit, col.top)
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
 
-
-            # # Connect column subunits
-            # top_subunit_name = None
-            # prev_subunit_name = None
-            # for subunit in self.column:
-            #     subunit_name = (
-            #             f"column_"
-            #             f"{subunit.name + '_' if len(self.column) > 1 else ''}"
-            #             f"{col_index}"
-            #             )
-                
-            #     # Store first subunit (i.e. top of column) and move to next
-            #     if prev_subunit_name is None:
-            #         top_subunit_name = subunit_name
-
-            #     # Otherwise connect previous subunit to current subunit
-            #     else:
-            #         flow_sheet.add_connection(
-            #             flow_sheet[prev_subunit_name],
-            #             flow_sheet[subunit_name]
-            #         )
-            #     prev_subunit_name = subunit_name
-            
-            # # Connect top and bottom subunits to each zone inlet/outlet respectively
-            # for zone in self.zones:
-            #     flow_sheet.add_connection(
-            #         zone.inlet_unit,
-            #         flow_sheet[top_subunit_name]
-            #     )
-            #     flow_sheet.add_connection(
-            #         flow_sheet[prev_subunit_name],  # equal to last subunit on last iteration
-            #         zone.outlet_unit
-            #     )
-
     def build_process(self) -> Process:
         """
         Assemble the process object.
