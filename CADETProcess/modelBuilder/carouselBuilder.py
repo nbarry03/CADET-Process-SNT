@@ -356,52 +356,20 @@ class CarouselBuilder(Structure):
             for upstream, downstream in zip(col.subunits, col.subunits[1:]):
                 flow_sheet.add_connection(upstream, downstream)
 
+        # Connect each bottom of each column to the top of next
+        cols = self._columns
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            flow_sheet.add_connection(this_col.bottom, next_col.top)
+
         # Connect zone inlets/outlets to column tops/bottoms respectively
         for zone in self.zones:
             for col in self._columns:
                     flow_sheet.add_connection(zone.inlet_unit, col.top)
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
 
-
-            # # Connect column subunits
-            # top_subunit_name = None
-            # prev_subunit_name = None
-            # for subunit in self.column:
-            #     subunit_name = (
-            #             f"column_"
-            #             f"{subunit.name + '_' if len(self.column) > 1 else ''}"
-            #             f"{col_index}"
-            #             )
-                
-            #     # Store first subunit (i.e. top of column) and move to next
-            #     if prev_subunit_name is None:
-            #         top_subunit_name = subunit_name
-
-            #     # Otherwise connect previous subunit to current subunit
-            #     else:
-            #         flow_sheet.add_connection(
-            #             flow_sheet[prev_subunit_name],
-            #             flow_sheet[subunit_name]
-            #         )
-            #     prev_subunit_name = subunit_name
-            
-            # # Connect top and bottom subunits to each zone inlet/outlet respectively
-            # for zone in self.zones:
-            #     flow_sheet.add_connection(
-            #         zone.inlet_unit,
-            #         flow_sheet[top_subunit_name]
-            #     )
-            #     flow_sheet.add_connection(
-            #         flow_sheet[prev_subunit_name],  # equal to last subunit on last iteration
-            #         zone.outlet_unit
-            #     )
-
-    def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
-        """Add connections within column template and within zones."""
-        # Connect subunits within each column
-        for col in self.columns:
-            for upstream, downstream in zip(col.subunits, col.subunits[1:]):
-                flow_sheet.add_connection(upstream, downstream)
+    def _set_output_states(self, flow_sheet: FlowSheet) -> NoReturn:
+        for unit in self.flow_sheet.output_states:
+            output_state = self.flow_sheet.output_states[unit]
 
         # Connect zone inlets/outlets to column tops/bottoms respectively
         for zone in self.zones:
@@ -411,6 +379,7 @@ class CarouselBuilder(Structure):
         
         # Connect each bottom of each column to the top of next
         self._add_ring_connections(flow_sheet)
+
 
     def build_process(self) -> Process:
         """
@@ -442,86 +411,40 @@ class CarouselBuilder(Structure):
             position_counter = 0
 
             for i_zone, zone in enumerate(self.zones):
-
+                # Grab slice of columns in current zone
+                zone_slice = slice(position_counter,
+                                   position_counter + zone.n_columns)
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
                     col_indices,
                     carousel_state
                 )
-                cols = [self.columns[i] for i in rotated_indices]
+                cols = [self._columns[i] for i in rotated_indices]
 
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
-                        f'{zone.name}_{carousel_state}',
-                        f'flow_sheet.output_states.{zone.inlet_unit.name}',
+                        f"{zone.name}_{carousel_state}",
+                        f"flow_sheet.output_states.{zone.inlet_unit}",
                         cols[0].index
                     )
-
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
                     )
 
-                    # Create event for each column
-                    for i_col, col in enumerate(cols):
-                        is_last = i_col == zone.n_columns - 1
-                        target_path = f'flow_sheet.output_states.{col.bottom.name}'
-                        dest = i_zone if is_last else self.n_zones
-
-                        evt = process.add_event(
-                            f'column_{col.index}_{carousel_state}',
-                            target_path,
-                            dest
-                        )
-                        process.add_event_dependency(
-                            evt.name, "switch_time", [carousel_state]
-                            )
-
-                elif isinstance(zone, ParallelZone):
-                    # Create split vector with n_columns number of slots
-                    total = len(self.columns)
-                    split = [0.0] * total
-                    share = 1.0 / zone.n_columns
-
-                    # Apply share to each active column in zone
-                    for col in cols:
-                        split[col.index] = share
-
-                    evt = process.add_event(
-                        f"{zone.name}_{carousel_state}",
-                        f"flow_sheet.output_states.{zone.inlet_unit.name}",
-                        split
-                    )
-                    process.add_event_dependency(
-                        evt.name,
-                        "switch_time",
-                        [carousel_state]
-                    )
-                    
-                    for col in cols:
+                    # Current column either feeds next column or goes
+                    # to outlet
+                    for seq_i, col in enumerate(cols):
+                        dest = (self.n_zones
+                                if seq_i < zone.n_columns - 1
+                                else i_zone)
                         evt = process.add_event(
                             f"column_{col.index}_{carousel_state}",
                             f"flow_sheet.output_states.{col.bottom.name}",
-                            i_zone
-                        )
-                        process.add_event_dependency(
-                            evt.name,
-                            "switch_time",
-                            [carousel_state]
+                            dest
                         )
 
-                # Set flow direction
-                for col in cols:
-                    evt = process.add_event(
-                        f"column_{col.index}_{carousel_state}_velocity",
-                        f"flow_sheet.{col.bottom.name}.flow_direction",
-                        zone.flow_direction
-                    )
-                    process.add_event_dependency(
-                        evt.name,
-                        "switch_time",
-                        [carousel_state]
-                    )
+                #TODO: Add ParallelZone behaviour
 
                 position_counter += zone.n_columns
 
