@@ -433,7 +433,38 @@ class CarouselBuilder(Structure):
                             evt.name, "switch_time", [carousel_state]
                         )
 
-                #TODO: Add ParallelZone behaviour
+                elif isinstance(zone, ParallelZone):
+                    # Create split vector with n_columns number of slots
+                    total = len(self._columns)
+                    split = [0.0] * total
+                    share = 1.0 / zone.n_columns
+
+                    # Apply share to each active column in zone
+                    for col in cols:
+                        split[col.index] = share
+
+                    evt = process.add_event(
+                        f"{zone.name}_{carousel_state}",
+                        f"flow_sheet.output_states.{zone.inlet_unit}",
+                        split
+                    )
+                    process.add_event_dependency(
+                        evt.name,
+                        "switch_time",
+                        [carousel_state]
+                    )
+                    
+                    for col in cols:
+                        evt = process.add_event(
+                            f"column_{col.index}_{carousel_state}",
+                            f"flow_sheet.output_states.{col.bottom.name}",
+                            i_zone
+                        )
+                        process.add_event_dependency(
+                            evt.name,
+                            "switch_time",
+                            [carousel_state]
+                        )
 
                 # Set flow direction
                 for col in cols:
