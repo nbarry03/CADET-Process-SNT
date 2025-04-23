@@ -354,16 +354,16 @@ class CarouselBuilder(Structure):
             for upstream, downstream in zip(col.subunits, col.subunits[1:]):
                 flow_sheet.add_connection(upstream, downstream)
 
-        # Connect each bottom of each column to the top of next
-        cols = self._columns
-        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
-            flow_sheet.add_connection(this_col.bottom, next_col.top)
-
         # Connect zone inlets/outlets to column tops/bottoms respectively
         for zone in self.zones:
             for col in self._columns:
                     flow_sheet.add_connection(zone.inlet_unit, col.top)
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
+        
+        # Connect each bottom of each column to the top of next
+        cols = self._columns
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            flow_sheet.add_connection(this_col.bottom, next_col.top)
 
 
 
@@ -398,8 +398,8 @@ class CarouselBuilder(Structure):
 
             for i_zone, zone in enumerate(self.zones):
                 # Grab slice of columns in current zone
-                zone_slice = slice(position_counter,
-                                   position_counter + zone.n_columns)
+                # zone_slice = slice(position_counter,
+                #                    position_counter + zone.n_columns)
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
@@ -429,8 +429,24 @@ class CarouselBuilder(Structure):
                             f"flow_sheet.output_states.{col.bottom.name}",
                             dest
                         )
+                        process.add_event_dependency(
+                            evt.name, "switch_time", [carousel_state]
+                        )
 
                 #TODO: Add ParallelZone behaviour
+
+                # Set flow direction
+                for col in cols:
+                    evt = process.add_event(
+                        f"column_{col.index}_{carousel_state}_velocity",
+                        f"flow_sheet.{col.bottom.name}.flow_direction",
+                        zone.flow_direction
+                    )
+                    process.add_event_dependency(
+                        evt.name,
+                        "switch_time",
+                        [carousel_state]
+                    )
 
                 position_counter += zone.n_columns
 
