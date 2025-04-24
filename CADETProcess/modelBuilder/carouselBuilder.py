@@ -195,6 +195,10 @@ class CarouselBuilder(Structure):
     def column(self) -> Tuple[TubularReactorBase, ...]:
         """Tuple[TubularReactorBase]: The column template for all zones."""
         return self._column
+    
+    @property
+    def columns(self) -> Tuple[Column]:
+        return self._columns
 
     @column.setter
     def column(self, column: TubularReactorBase | Iterable[TubularReactorBase]) -> NoReturn:
@@ -397,9 +401,7 @@ class CarouselBuilder(Structure):
             position_counter = 0
 
             for i_zone, zone in enumerate(self.zones):
-                # Grab slice of columns in current zone
-                # zone_slice = slice(position_counter,
-                #                    position_counter + zone.n_columns)
+
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
@@ -480,72 +482,6 @@ class CarouselBuilder(Structure):
                     )
 
                 position_counter += zone.n_columns
-
-
-        #         col_indices = np.arange(zone.n_columns)
-        #         col_indices += position_counter
-        #         col_indices = self.column_indices_at_state(col_indices, carousel_state)
-
-        #         if isinstance(zone, SerialZone):
-        #             evt = process.add_event(
-        #                 f"{zone.name}_{carousel_state}",
-        #                 f"flow_sheet.output_states.{zone.inlet_unit}",
-        #                 col_indices[0],
-        #             )
-        #             process.add_event_dependency(
-        #                 evt.name, "switch_time", [carousel_state]
-        #             )
-        #             for i, col in enumerate(col_indices):
-        #                 if i < (zone.n_columns - 1):
-        #                     evt = process.add_event(
-        #                         f"column_{col}_{carousel_state}",
-        #                         f"flow_sheet.output_states.column_{col}",
-        #                         self.n_zones,
-        #                     )
-        #                 else:
-        #                     evt = process.add_event(
-        #                         f"column_{col}_{carousel_state}",
-        #                         f"flow_sheet.output_states.column_{col}",
-        #                         i_zone,
-        #                     )
-        #                 process.add_event_dependency(
-        #                     evt.name, "switch_time", [carousel_state]
-        #                 )
-        #         elif isinstance(zone, ParallelZone):
-        #             output_state = self.n_columns * [0]
-        #             for col in col_indices:
-        #                 output_state[col] = 1 / zone.n_columns
-
-        #             evt = process.add_event(
-        #                 f"{zone.name}_{carousel_state}",
-        #                 f"flow_sheet.output_states.{zone.inlet_unit}",
-        #                 output_state,
-        #             )
-        #             process.add_event_dependency(
-        #                 evt.name, "switch_time", [carousel_state]
-        #             )
-
-        #             for col in col_indices:
-        #                 evt = process.add_event(
-        #                     f"column_{col}_{carousel_state}",
-        #                     f"flow_sheet.output_states.column_{col}",
-        #                     i_zone,
-        #                 )
-        #                 process.add_event_dependency(
-        #                     evt.name, "switch_time", [carousel_state]
-        #                 )
-
-        #         for i, col in enumerate(col_indices):
-        #             evt = process.add_event(
-        #                 f"column_{col}_{carousel_state}_velocity",
-        #                 f"flow_sheet.column_{col}.flow_direction",
-        #                 zone.flow_direction,
-        #             )
-        #             process.add_event_dependency(
-        #                 evt.name, "switch_time", [carousel_state]
-        #             )
-
-        #         position_counter += zone.n_columns
 
     def carousel_state(self, t) -> float:
         """int: Carousel state at given time.
