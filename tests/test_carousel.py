@@ -588,6 +588,65 @@ class Test_Carousel(unittest.TestCase):
                 np.testing.assert_almost_equal(
                     flow_direction, expected
                     )
+    
+    def test_single_subunit_column(self):
+        """Test a system with a single column subunit."""
+        builder = self.create_serial()
+        builder.column = LumpedRateModelWithoutPores(self.component_system, name='column')
+        flow_sheet = builder.build_flow_sheet()
+
+        # Check that n columns exist
+        self.assertEqual(len(builder.columns), builder.n_columns)
+
+        serial_zone = builder.zones[0]
+        cols = builder.columns
+
+        # Each column has a single subunit
+        for col in cols:
+            with self.subTest(column=col.index):
+                self.assertEqual(len(col.subunits),1)
+
+        # No intracolumn chaining exists
+        for col in cols:
+            name = col.subunits[0].name
+            with self.subTest(column=col.index):
+                self.assertFalse(
+                    flow_sheet.connection_exists(name, name),
+                    msg=f'Unexpected self-chain on {name}'
+                )
+        
+        # Zone inlet connects to subunit, subunit to zone outlet
+        for col in cols:
+            sub = col.subunits[0]
+            with self.subTest(column=col.index, connection='zone inlet to column'):
+                self.assertTrue(
+                    flow_sheet.connection_exists(
+                        serial_zone.inlet_unit.name,
+                        sub.name
+                    ),
+                    msg=f'{serial_zone.inlet_unit.name} connection to {sub.name}'
+                )
+                self.assertTrue(
+                    flow_sheet.connection_exists(
+                        sub.name,
+                        serial_zone.outlet_unit.name
+                    ),
+                    msg=f'{sub.name} connection to {serial_zone.outlet_unit.name}'
+                )
+
+        # Columns are chained in order
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            with self.subTest(connection='column chain', column=this_col.index):
+                this_col_name = this_col.subunits[0].name
+                next_col_name = next_col.subunits[0].name
+                self.assertTrue(
+                    flow_sheet.connection_exists(
+                        this_col_name, next_col_name
+                    ),
+                    msg=f'{this_col_name} connection to {next_col_name}'
+                )
+
+
 
     def test_simulation(self):
         builder = self.create_serial()
