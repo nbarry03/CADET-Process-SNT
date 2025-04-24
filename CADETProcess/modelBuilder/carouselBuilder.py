@@ -259,6 +259,10 @@ class CarouselBuilder(Structure):
     def column(self) -> Tuple[TubularReactorBase, ...]:
         """Tuple[TubularReactorBase]: The column template for all zones."""
         return self._column
+    
+    @property
+    def columns(self) -> Tuple[Column]:
+        return self._columns
 
     @column.setter
     def column(self, column: TubularReactorBase | Iterable[TubularReactorBase]) -> NoReturn:
@@ -469,9 +473,7 @@ class CarouselBuilder(Structure):
             position_counter = 0
 
             for i_zone, zone in enumerate(self.zones):
-                # Grab slice of columns in current zone
-                # zone_slice = slice(position_counter,
-                #                    position_counter + zone.n_columns)
+
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
