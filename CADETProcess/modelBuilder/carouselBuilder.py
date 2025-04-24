@@ -411,9 +411,7 @@ class CarouselBuilder(Structure):
             position_counter = 0
 
             for i_zone, zone in enumerate(self.zones):
-                # Grab slice of columns in current zone
-                # zone_slice = slice(position_counter,
-                #                    position_counter + zone.n_columns)
+
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
