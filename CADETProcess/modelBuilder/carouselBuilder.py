@@ -24,6 +24,7 @@ __all__ = [
     "SerialZone",
     "ParallelZone",
     "CarouselBuilder",
+    "SerialCarouselBuilder",
     "SMBBuilder",
     "LinearSMBBuilder",
     "LangmuirSMBBuilder",
