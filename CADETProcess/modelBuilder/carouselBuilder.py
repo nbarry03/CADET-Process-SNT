@@ -660,30 +660,6 @@ class SerialCarouselBuilder(CarouselBuilder):
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
                             )
-                    
-                    # evt = process.add_event(
-                    #     f"{zone.name}_{carousel_state}",
-                    #     f"flow_sheet.output_states.{zone.inlet_unit}",
-                    #     cols[0].index
-                    # )
-                    # process.add_event_dependency(
-                    #     evt.name, "switch_time", [carousel_state]
-                    # )
-
-                    # # Current column either feeds next column or goes
-                    # # to outlet
-                    # for seq_i, col in enumerate(cols):
-                    #     dest = (self.n_zones
-                    #             if seq_i < zone.n_columns - 1
-                    #             else i_zone)
-                    #     evt = process.add_event(
-                    #         f"column_{col.index}_{carousel_state}",
-                    #         f"flow_sheet.output_states.{col.bottom.name}",
-                    #         dest
-                    #     )
-                    #     process.add_event_dependency(
-                    #         evt.name, "switch_time", [carousel_state]
-                    #     )
 
                 elif isinstance(zone, ParallelZone):
                     raise TypeError('SerialCarouselBuilder only supports SerialZones.')
