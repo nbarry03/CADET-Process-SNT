@@ -371,7 +371,7 @@ class CarouselBuilder(Structure):
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
         
         # Connect each bottom of each column to the top of next
-        self._add_ring_connections(self, flow_sheet)
+        self._add_ring_connections(flow_sheet)
 
 
 
