@@ -351,6 +351,12 @@ class CarouselBuilder(Structure):
             output_state = self.flow_sheet.output_states[zone]
             flow_sheet.set_output_state(zone.outlet_unit, output_state)
 
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """Add simple ring connection: col.bottom -> col.top."""
+        cols = self._columns
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            flow_sheet.add_connection(this_col.bottom, next_col.top)
+
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections within column template and within zones."""
         # Connect subunits within each column
@@ -365,9 +371,7 @@ class CarouselBuilder(Structure):
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
         
         # Connect each bottom of each column to the top of next
-        cols = self._columns
-        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
-            flow_sheet.add_connection(this_col.bottom, next_col.top)
+        self._add_ring_connections(self, flow_sheet)
 
 
 
@@ -392,7 +396,7 @@ class CarouselBuilder(Structure):
         """float: cycle time of the process."""
         return self.n_columns * self.switch_time
 
-    def _add_events(self, process):
+    def _add_events(self, process:Process) -> NoReturn:
         """Add events to process."""
         process.cycle_time = self.n_columns * self.switch_time
         process.add_duration("switch_time", self.switch_time)
@@ -541,6 +545,162 @@ class CarouselBuilder(Structure):
         )
 
         return column_indices
+    
+class SerialCarouselBuilder(CarouselBuilder):
+    """
+    Configurator for a Serial only SMB system with pipes modelled 
+    in between columns within the same serial zone.
+    """
+    def __init__(
+            self,
+            component_system: ComponentSystem,
+            name: str
+            ):
+        super().__init__(component_system, name)
+        self._pipe: TubularReactorBase | None = None
+
+    @property
+    def pipe(self) -> TubularReactorBase:
+        """Pipe template for connections between columns within a SerialZone."""
+        return self._pipe
+
+    @pipe.setter
+    def pipe(self, pipe:TubularReactorBase | None) -> NoReturn:
+        if not isinstance(pipe, TubularReactorBase):
+            raise TypeError("Pipe must be an instance of TubularReactorBase.")
+        else:
+            self._pipe = pipe
+
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """
+        Overrides simple add ring connections.
+        Handles optional pipe between columns within SerialZone and sets pipe
+        initial states.
+        """
+        cols = self.columns
+        adjacency = zip(cols, cols[1:] + cols[:1])
+        if self.pipe_template is None:
+            # Directly link col bottom -> next col top
+            # this is mainly added for compatibility
+            for this_col, next_col in adjacency:
+                flow_sheet.add_connection(this_col.bottom, next_col.top)
+        else:
+            # Insert pipe between each column pair
+            for this_col, next_col in adjacency:
+                pipe = deepcopy(self.pipe)
+                pipe.component_system = self.component_system
+                pipe.name = f'pipe_{this_col.index}_{next_col.index}'
+                flow_sheet.add_unit(pipe)
+                # Propogate initial state
+                for zone in self.zones:
+                    if isinstance(zone, SerialZone):
+                        # Determine which zone the pipe belongs to
+                        start = sum(z2 for z2 in self.zones[:self.zones.index(zone)])
+                        # if this col index (which is the global index)
+                        # falls within the zone start and end, apply initial state
+                        if start <= this_col.index < start + zone.n_columns:
+                            if zone.initial_state is not None:
+                                local_index = this_col.index - start
+                                pipe.initial_state = zone.initial_state[local_index]
+                            break
+                flow_sheet.add_connection(this_col.bottom, pipe)
+                flow_sheet.add_connection(pipe, next_col.top)
+
+    def _add_events(self, process:Process) -> NoReturn:
+        """Add events to process and route through pipes."""
+        # This is fully overriding the _add_events method from CarouselBuilder
+        # this could probably be abstracted more to be a bit more surgical in
+        # what is  overridden
+        process.cycle_time = self.n_columns * self.switch_time
+        process.add_duration("switch_time", self.switch_time)
+
+        for carousel_state in range(self.n_columns):
+            position_counter = 0
+
+            for i_zone, zone in enumerate(self.zones):
+
+                col_indices = np.arange(zone.n_columns)
+                col_indices += position_counter
+                rotated_indices = self.column_indices_at_state(
+                    col_indices,
+                    carousel_state
+                )
+                cols = [self._columns[i] for i in rotated_indices]
+
+                if isinstance(zone, SerialZone):
+                    evt = process.add_event(
+                        f'{zone.name}_{carousel_state}',
+                        f'flow_sheet.output_states.{zone.inlet_unit}',
+                        cols[0].index
+                    )
+
+                    process.add_event_dependency(
+                        evt.name, "switch_time", [carousel_state]
+                    )
+
+                    # Create event for each column
+                    for i_col, col in enumerate(cols):
+                        if i_col < zone.n_columns - 1:
+                            if self.pipe:
+                                target = f'pipe_{col.index}_{cols[i_col+1].index}'
+                                dest = self.n_zones
+                            else:
+                                target = col.bottom.name
+                                dest = self.n_zones
+                        else:
+                            # Connect last column to zone outlet
+                            target = col.bottom.name
+                            dest = i_zone
+                        evt = process.add_event(
+                            f'column_{col.index}_{carousel_state}',
+                            f'flow_sheet.output_states.{target}',
+                            dest
+                        )
+                        process.add_event_dependency(
+                            evt.name, "switch_time", [carousel_state]
+                            )
+                    
+                    # evt = process.add_event(
+                    #     f"{zone.name}_{carousel_state}",
+                    #     f"flow_sheet.output_states.{zone.inlet_unit}",
+                    #     cols[0].index
+                    # )
+                    # process.add_event_dependency(
+                    #     evt.name, "switch_time", [carousel_state]
+                    # )
+
+                    # # Current column either feeds next column or goes
+                    # # to outlet
+                    # for seq_i, col in enumerate(cols):
+                    #     dest = (self.n_zones
+                    #             if seq_i < zone.n_columns - 1
+                    #             else i_zone)
+                    #     evt = process.add_event(
+                    #         f"column_{col.index}_{carousel_state}",
+                    #         f"flow_sheet.output_states.{col.bottom.name}",
+                    #         dest
+                    #     )
+                    #     process.add_event_dependency(
+                    #         evt.name, "switch_time", [carousel_state]
+                    #     )
+
+                elif isinstance(zone, ParallelZone):
+                    raise TypeError('SerialCarouselBuilder only supports SerialZones.')
+
+                # Set flow direction
+                for col in cols:
+                    evt = process.add_event(
+                        f"column_{col.index}_{carousel_state}_velocity",
+                        f"flow_sheet.{col.bottom.name}.flow_direction",
+                        zone.flow_direction
+                    )
+                    process.add_event_dependency(
+                        evt.name,
+                        "switch_time",
+                        [carousel_state]
+                    )
+
+                position_counter += zone.n_columns
 
 
 class SMBBuilder(CarouselBuilder):
