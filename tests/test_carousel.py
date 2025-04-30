@@ -5,7 +5,9 @@ from CADETProcess.processModel import ComponentSystem
 from CADETProcess.processModel import Linear
 from CADETProcess.processModel import Inlet, Outlet, LumpedRateModelWithoutPores
 
-from CADETProcess.modelBuilder import CarouselBuilder, SerialZone, ParallelZone
+from CADETProcess.modelBuilder import (
+    CarouselBuilder, SerialCarouselBuilder, SerialZone, ParallelZone
+    )
 
 from CADETProcess.simulator import Cadet
 
@@ -658,6 +660,147 @@ class Test_Carousel(unittest.TestCase):
         builder = self.create_serial()
         process = builder.build_process()
 
+        process_simulator = Cadet()
+        simulation_results = process_simulator.simulate(process)
+
+        self.assertEqual(simulation_results.exit_flag, 0)
+
+
+class Test_SerialCarousel(unittest.TestCase):
+    """
+    Test suite to handle the specific implementations for the SerialCarouselBuilder.
+    """
+    def setUp(self):
+        self.component_system = ComponentSystem(2)
+
+        self.binding_model = Linear(self.component_system)
+        self.binding_model.adsorption_rate = [6, 8]
+        self.binding_model.desorption_rate = [1, 1]
+
+        self.column = [
+            LumpedRateModelWithoutPores(self.component_system, name='upstream'),
+            LumpedRateModelWithoutPores(self.component_system, name='downstream')
+            ]
+        for subunit in self.column:
+            subunit.length = 0.6
+            subunit.diameter = 0.024
+            subunit.axial_dispersion = 4.7e-7
+            subunit.total_porosity = 0.7
+
+            subunit.binding_model = self.binding_model
+
+        self.pipe = LumpedRateModelWithoutPores(self.component_system, name='pipe')
+        
+    def create_carousel(self, with_pipe:bool):
+        source = Inlet(self.component_system, name='feed')
+        sink = Outlet(self.component_system, name='raffinate')
+        serial_zone = SerialZone(self.component_system, 'serial_zone', 3)
+
+        builder = SerialCarouselBuilder(self.component_system, 'serial_carousel')
+        builder.column = self.column
+        if with_pipe:
+            builder.pipe = self.pipe
+        
+        builder.add_unit(source)
+        builder.add_unit(sink)
+        builder.add_unit(serial_zone)
+
+        builder.add_connection(source, serial_zone)
+        builder.add_connection(serial_zone, sink)
+
+        builder.switch_time = 300
+
+        return builder, serial_zone
+    
+    def test_units_and_pipes(self):
+        """Check if units are created, and pipes if passed."""
+        for mode in (False, True):
+            builder, _ = self.create_carousel(with_pipe=mode)
+            flow_sheet = builder.build_flow_sheet()
+
+            # Expect 3 columns * 2 subunits = 6 units total
+            n_cols = builder.n_columns
+            n_col_units_expected =  n_cols * len(builder.column)
+            n_pipes_expected = n_cols if mode else 0  # system with n cols has n pipes
+            self.assertEqual(
+                len([u for u in flow_sheet.units if 'pipe_' in u.name]),
+                n_pipes_expected
+            )
+            self.assertEqual(
+                len([u for u in flow_sheet.units if 'column_' in u.name]),
+                n_col_units_expected
+            )
+    
+    def test_ring_connections(self):
+        """Check if column bottom -> pipe -> column top."""
+        builder, _ = self.create_carousel(with_pipe=True)
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            pipe_name = f'pipe_{this_col.index}_{next_col.index}'
+            self.assertTrue(
+                flow_sheet.connection_exists(
+                    this_col.bottom.name, pipe_name
+                )
+            )
+            self.assertTrue(
+                pipe_name, next_col.top.name
+            )
+
+        builder, _ = self.create_carousel(with_pipe=False)
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            self.assertTrue(
+                flow_sheet.connection_exists(
+                    this_col.bottom.name, next_col.top.name
+                )
+            )
+    
+    def test_pipe_initial_state(self):
+        """Check that pipe initial states are set to the owning zone."""
+        builder, zone = self.create_carousel(with_pipe=True)
+        zone.initial_state = [
+            {'c': [1, 1]}, {'c': [2, 2]}, {'c': [3, 3]}
+        ]
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            pipe = flow_sheet[f'pipe_{this_col.index}_{next_col.index}']
+            expected = zone.initial_state[this_col.index]['c']
+            self.assertAlmostEqual(
+                pipe.initial_state['c'], expected
+            )
+    
+    def test_event_targets(self):
+        """Check that events route the correct ports."""
+        builder, _ = self.create_carousel(with_pipe=True)
+        process = builder.build_process()
+
+        event_names = {e.name:e for e in process.events}
+
+        # First column
+        evt = event_names['column_0_0']
+        self.assertEqual(
+            evt.parameter_path,
+            'flow_sheet.output_states.column_downstream_0'
+        )
+        self.assertEqual(evt.state, builder.n_zones) # should be routed to last port
+        
+        # Last column
+        evt = event_names['column_2_0']
+        self.assertEqual(
+            evt.parameter_path,
+            'flow_sheet.output_states.column_downstream_2'
+            )
+        self.assertEqual(evt.state, 0)  # should be routed to zone outlet (first port)
+
+    def test_simulate(self):
+        builder, _ = self.create_carousel(with_pipe=False)
+        process = builder.build_process
         process_simulator = Cadet()
         simulation_results = process_simulator.simulate(process)
 
