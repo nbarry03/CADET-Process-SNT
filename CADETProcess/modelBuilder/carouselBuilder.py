@@ -417,31 +417,6 @@ class CarouselBuilder(Structure):
 
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
-                        f"{zone.name}_{carousel_state}",
-                        f"flow_sheet.output_states.{zone.inlet_unit}",
-                        cols[0].index
-                    )
-                    process.add_event_dependency(
-                        evt.name, "switch_time", [carousel_state]
-                    )
-
-                    # Current column either feeds next column or goes
-                    # to outlet
-                    for seq_i, col in enumerate(cols):
-                        dest = (self.n_zones
-                                if seq_i < zone.n_columns - 1
-                                else i_zone)
-                        evt = process.add_event(
-                            f"column_{col.index}_{carousel_state}",
-                            f"flow_sheet.output_states.{col.bottom.name}",
-                            dest
-                        )
-                        process.add_event_dependency(
-                            evt.name, "switch_time", [carousel_state]
-                        )
-                        
-                if isinstance(zone, SerialZone):
-                    evt = process.add_event(
                         f'{zone.name}_{carousel_state}',
                         f'flow_sheet.output_states.{zone.inlet_unit.name}',
                         cols[0].index
@@ -478,7 +453,7 @@ class CarouselBuilder(Structure):
 
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
-                        f"flow_sheet.output_states.{zone.inlet_unit}",
+                        f"flow_sheet.output_states.{zone.inlet_unit.name}",
                         split
                     )
                     process.add_event_dependency(
@@ -638,71 +613,6 @@ class SerialCarouselBuilder(CarouselBuilder):
 
                 flow_sheet.add_connection(this_col.bottom, pipe)
                 flow_sheet.add_connection(pipe, next_col.top)
-
-    def _add_events(self, process:Process) -> NoReturn:
-        """Add events to process and route through pipes."""
-        # This is fully overriding the _add_events method from CarouselBuilder
-        # this could probably be abstracted more to be a bit more surgical in
-        # what is  overridden
-        process.cycle_time = self.n_columns * self.switch_time
-        process.add_duration("switch_time", self.switch_time)
-
-        for carousel_state in range(self.n_columns):
-            position_counter = 0
-
-            for i_zone, zone in enumerate(self.zones):
-
-                col_indices = np.arange(zone.n_columns)
-                col_indices += position_counter
-                rotated_indices = self.column_indices_at_state(
-                    col_indices,
-                    carousel_state
-                )
-                cols = [self._columns[i] for i in rotated_indices]
-
-                if isinstance(zone, SerialZone):
-                    evt = process.add_event(
-                        f'{zone.name}_{carousel_state}',
-                        f'flow_sheet.output_states.{zone.inlet_unit.name}',
-                        cols[0].index
-                    )
-
-                    process.add_event_dependency(
-                        evt.name, "switch_time", [carousel_state]
-                    )
-
-                    # Create event for each column
-                    for i_col, col in enumerate(cols):
-                        is_last = i_col == zone.n_columns - 1
-                        target_path = f'flow_sheet.output_states.{col.bottom.name}'
-                        dest = i_zone if is_last else self.n_zones
-
-                        evt = process.add_event(
-                            f'column_{col.index}_{carousel_state}',
-                            target_path,
-                            dest
-                        )
-                        process.add_event_dependency(
-                            evt.name, "switch_time", [carousel_state]
-                            )
-
-                elif isinstance(zone, ParallelZone):
-                    raise TypeError('SerialCarouselBuilder only supports SerialZones.')
-
-                # Set flow direction
-                for col in cols:
-                    evt = process.add_event(
-                        f"column_{col.index}_{carousel_state}_velocity",
-                        f"flow_sheet.{col.bottom.name}.flow_direction",
-                        zone.flow_direction
-                    )
-                    process.add_event_dependency(
-                        evt.name,
-                        "switch_time",
-                        [carousel_state]
-                    )
-
-                position_counter += zone.n_columns
 
 
 class SMBBuilder(CarouselBuilder):
