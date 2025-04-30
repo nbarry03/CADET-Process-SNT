@@ -439,6 +439,32 @@ class CarouselBuilder(Structure):
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
                         )
+                        
+                if isinstance(zone, SerialZone):
+                    evt = process.add_event(
+                        f'{zone.name}_{carousel_state}',
+                        f'flow_sheet.output_states.{zone.inlet_unit.name}',
+                        cols[0].index
+                    )
+
+                    process.add_event_dependency(
+                        evt.name, "switch_time", [carousel_state]
+                    )
+
+                    # Create event for each column
+                    for i_col, col in enumerate(cols):
+                        is_last = i_col == zone.n_columns - 1
+                        target_path = f'flow_sheet.output_states.{col.bottom.name}'
+                        dest = i_zone if is_last else self.n_zones
+
+                        evt = process.add_event(
+                            f'column_{col.index}_{carousel_state}',
+                            target_path,
+                            dest
+                        )
+                        process.add_event_dependency(
+                            evt.name, "switch_time", [carousel_state]
+                            )
 
                 elif isinstance(zone, ParallelZone):
                     # Create split vector with n_columns number of slots
@@ -567,10 +593,22 @@ class SerialCarouselBuilder(CarouselBuilder):
 
     @pipe.setter
     def pipe(self, pipe:TubularReactorBase | None) -> NoReturn:
-        if not isinstance(pipe, TubularReactorBase):
-            raise TypeError("Pipe must be an instance of TubularReactorBase.")
+        if pipe is not None and not isinstance(pipe, TubularReactorBase):
+            raise TypeError("Pipe must be an instance of TubularReactorBase or None.")
         else:
             self._pipe = pipe
+
+    def _find_pipe_zone_and_local_index(
+            self,
+            col_index:int
+            ) -> tuple[SerialZone,int] | None:
+        """Finds which zone a pipe belongs to."""
+        cum = 0
+        for zone in self.zones:
+            if cum <= col_index < cum + zone.n_columns:
+                return zone, col_index - cum
+            cum += zone.n_columns
+        return None
 
     def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """
@@ -580,7 +618,7 @@ class SerialCarouselBuilder(CarouselBuilder):
         """
         cols = self.columns
         adjacency = zip(cols, cols[1:] + cols[:1])
-        if self.pipe_template is None:
+        if self.pipe is None:
             # Directly link col bottom -> next col top
             # this is mainly added for compatibility
             for this_col, next_col in adjacency:
@@ -593,17 +631,11 @@ class SerialCarouselBuilder(CarouselBuilder):
                 pipe.name = f'pipe_{this_col.index}_{next_col.index}'
                 flow_sheet.add_unit(pipe)
                 # Propogate initial state
-                for zone in self.zones:
-                    if isinstance(zone, SerialZone):
-                        # Determine which zone the pipe belongs to
-                        start = sum(z2 for z2 in self.zones[:self.zones.index(zone)])
-                        # if this col index (which is the global index)
-                        # falls within the zone start and end, apply initial state
-                        if start <= this_col.index < start + zone.n_columns:
-                            if zone.initial_state is not None:
-                                local_index = this_col.index - start
-                                pipe.initial_state = zone.initial_state[local_index]
-                            break
+                owner = self._find_pipe_zone_and_local_index(this_col.index)
+                if owner is not None and owner[0].initial_state is not None:
+                    _, local = owner
+                    pipe.initial_state = owner[0].initial_state[local]
+
                 flow_sheet.add_connection(this_col.bottom, pipe)
                 flow_sheet.add_connection(pipe, next_col.top)
 
@@ -631,7 +663,7 @@ class SerialCarouselBuilder(CarouselBuilder):
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
                         f'{zone.name}_{carousel_state}',
-                        f'flow_sheet.output_states.{zone.inlet_unit}',
+                        f'flow_sheet.output_states.{zone.inlet_unit.name}',
                         cols[0].index
                     )
 
@@ -641,20 +673,13 @@ class SerialCarouselBuilder(CarouselBuilder):
 
                     # Create event for each column
                     for i_col, col in enumerate(cols):
-                        if i_col < zone.n_columns - 1:
-                            if self.pipe:
-                                target = f'pipe_{col.index}_{cols[i_col+1].index}'
-                                dest = self.n_zones
-                            else:
-                                target = col.bottom.name
-                                dest = self.n_zones
-                        else:
-                            # Connect last column to zone outlet
-                            target = col.bottom.name
-                            dest = i_zone
+                        is_last = i_col == zone.n_columns - 1
+                        target_path = f'flow_sheet.output_states.{col.bottom.name}'
+                        dest = i_zone if is_last else self.n_zones
+
                         evt = process.add_event(
                             f'column_{col.index}_{carousel_state}',
-                            f'flow_sheet.output_states.{target}',
+                            target_path,
                             dest
                         )
                         process.add_event_dependency(
