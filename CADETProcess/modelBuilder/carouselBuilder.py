@@ -24,6 +24,7 @@ __all__ = [
     "SerialZone",
     "ParallelZone",
     "CarouselBuilder",
+    "SerialCarouselBuilder",
     "SMBBuilder",
     "LinearSMBBuilder",
     "LangmuirSMBBuilder",
@@ -351,6 +352,12 @@ class CarouselBuilder(Structure):
             output_state = self.flow_sheet.output_states[zone]
             flow_sheet.set_output_state(zone.outlet_unit, output_state)
 
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """Add simple ring connection: col.bottom -> col.top."""
+        cols = self._columns
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            flow_sheet.add_connection(this_col.bottom, next_col.top)
+
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections within column template and within zones."""
         # Connect subunits within each column
@@ -365,11 +372,7 @@ class CarouselBuilder(Structure):
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
         
         # Connect each bottom of each column to the top of next
-        cols = self.columns
-        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
-            flow_sheet.add_connection(this_col.bottom, next_col.top)
-
-
+        self._add_ring_connections(flow_sheet)
 
     def build_process(self) -> Process:
         """
@@ -392,7 +395,7 @@ class CarouselBuilder(Structure):
         """float: cycle time of the process."""
         return self.n_columns * self.switch_time
 
-    def _add_events(self, process):
+    def _add_events(self, process:Process) -> NoReturn:
         """Add events to process."""
         process.cycle_time = self.n_columns * self.switch_time
         process.add_duration("switch_time", self.switch_time)
@@ -412,28 +415,29 @@ class CarouselBuilder(Structure):
 
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
-                        f"{zone.name}_{carousel_state}",
-                        f"flow_sheet.output_states.{zone.inlet_unit}",
+                        f'{zone.name}_{carousel_state}',
+                        f'flow_sheet.output_states.{zone.inlet_unit.name}',
                         cols[0].index
                     )
+
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
                     )
 
-                    # Current column either feeds next column or goes
-                    # to outlet
-                    for seq_i, col in enumerate(cols):
-                        dest = (self.n_zones
-                                if seq_i < zone.n_columns - 1
-                                else i_zone)
+                    # Create event for each column
+                    for i_col, col in enumerate(cols):
+                        is_last = i_col == zone.n_columns - 1
+                        target_path = f'flow_sheet.output_states.{col.bottom.name}'
+                        dest = i_zone if is_last else self.n_zones
+
                         evt = process.add_event(
-                            f"column_{col.index}_{carousel_state}",
-                            f"flow_sheet.output_states.{col.bottom.name}",
+                            f'column_{col.index}_{carousel_state}',
+                            target_path,
                             dest
                         )
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
-                        )
+                            )
 
                 elif isinstance(zone, ParallelZone):
                     # Create split vector with n_columns number of slots
@@ -447,7 +451,7 @@ class CarouselBuilder(Structure):
 
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
-                        f"flow_sheet.output_states.{zone.inlet_unit}",
+                        f"flow_sheet.output_states.{zone.inlet_unit.name}",
                         split
                     )
                     process.add_event_dependency(
@@ -541,6 +545,72 @@ class CarouselBuilder(Structure):
         )
 
         return column_indices
+    
+class SerialCarouselBuilder(CarouselBuilder):
+    """
+    Configurator for a Serial only SMB system with pipes modelled 
+    in between columns within the same serial zone.
+    """
+    def __init__(
+            self,
+            component_system: ComponentSystem,
+            name: str
+            ):
+        super().__init__(component_system, name)
+        self._pipe: TubularReactorBase | None = None
+
+    @property
+    def pipe(self) -> TubularReactorBase:
+        """Pipe template for connections between columns within a SerialZone."""
+        return self._pipe
+
+    @pipe.setter
+    def pipe(self, pipe:TubularReactorBase | None) -> NoReturn:
+        if pipe is not None and not isinstance(pipe, TubularReactorBase):
+            raise TypeError("Pipe must be an instance of TubularReactorBase or None.")
+        else:
+            self._pipe = pipe
+
+    def _find_pipe_zone_and_local_index(
+            self,
+            col_index:int
+            ) -> tuple[SerialZone,int] | None:
+        """Finds which zone a pipe belongs to."""
+        cum = 0
+        for zone in self.zones:
+            if cum <= col_index < cum + zone.n_columns:
+                return zone, col_index - cum
+            cum += zone.n_columns
+        return None
+
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """
+        Overrides simple add ring connections.
+        Handles optional pipe between columns within SerialZone and sets pipe
+        initial states.
+        """
+        cols = self.columns
+        adjacency = zip(cols, cols[1:] + cols[:1])
+        if self.pipe is None:
+            # Directly link col bottom -> next col top
+            # this is mainly added for compatibility
+            for this_col, next_col in adjacency:
+                flow_sheet.add_connection(this_col.bottom, next_col.top)
+        else:
+            # Insert pipe between each column pair
+            for this_col, next_col in adjacency:
+                pipe = deepcopy(self.pipe)
+                pipe.component_system = self.component_system
+                pipe.name = f'pipe_{this_col.index}_{next_col.index}'
+                flow_sheet.add_unit(pipe)
+                # Propogate initial state
+                owner = self._find_pipe_zone_and_local_index(this_col.index)
+                if owner is not None and owner[0].initial_state is not None:
+                    _, local = owner
+                    pipe.initial_state = owner[0].initial_state[local]
+
+                flow_sheet.add_connection(this_col.bottom, pipe)
+                flow_sheet.add_connection(pipe, next_col.top)
 
 
 class SMBBuilder(CarouselBuilder):
