@@ -67,7 +67,8 @@ def setup_process(unit_type):
         grm.diameter = 1e-2
         grm.bed_porosity = 0.7
         grm.particle_radius = 1e-6
-        grm.particle_porosity = 0.7
+        grm.particle_porosity = [0.7]
+        grm.par_type_volfrac = [1]
         grm.axial_dispersion = 1e-6
         grm.film_diffusion = 2 * [1e-3]
         grm.pore_diffusion = 2 * [1e-3]
