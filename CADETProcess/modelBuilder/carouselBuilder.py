@@ -314,7 +314,7 @@ class CarouselBuilder(Structure):
                     subunits.append(sub)
 
                 # Aggregate Column objects
-                self._columns.append(
+                self.columns.append(
                     Column(index = col_index, subunits = subunits)
                 )
                 col_index += 1
@@ -361,20 +361,18 @@ class CarouselBuilder(Structure):
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections within column template and within zones."""
         # Connect subunits within each column
-        for col in self._columns:
+        for col in self.columns:
             for upstream, downstream in zip(col.subunits, col.subunits[1:]):
                 flow_sheet.add_connection(upstream, downstream)
 
         # Connect zone inlets/outlets to column tops/bottoms respectively
         for zone in self.zones:
-            for col in self._columns:
+            for col in self.columns:
                     flow_sheet.add_connection(zone.inlet_unit, col.top)
                     flow_sheet.add_connection(col.bottom, zone.outlet_unit)
         
         # Connect each bottom of each column to the top of next
         self._add_ring_connections(flow_sheet)
-
-
 
     def build_process(self) -> Process:
         """
@@ -413,7 +411,7 @@ class CarouselBuilder(Structure):
                     col_indices,
                     carousel_state
                 )
-                cols = [self._columns[i] for i in rotated_indices]
+                cols = [self.columns[i] for i in rotated_indices]
 
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
@@ -443,7 +441,7 @@ class CarouselBuilder(Structure):
 
                 elif isinstance(zone, ParallelZone):
                     # Create split vector with n_columns number of slots
-                    total = len(self._columns)
+                    total = len(self.columns)
                     split = [0.0] * total
                     share = 1.0 / zone.n_columns
 
