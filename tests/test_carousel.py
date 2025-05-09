@@ -800,7 +800,7 @@ class Test_SerialCarousel(unittest.TestCase):
 
     def test_simulate(self):
         builder, _ = self.create_carousel(with_pipe=False)
-        process = builder.build_process
+        process = builder.build_process()
         process_simulator = Cadet()
         simulation_results = process_simulator.simulate(process)
 
