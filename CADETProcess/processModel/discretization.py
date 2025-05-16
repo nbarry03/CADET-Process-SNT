@@ -16,7 +16,7 @@ from CADETProcess.dataStructure import Structure, frozen_attributes
 from CADETProcess.dataStructure import (
     Constant, Bool, Switch,
     RangedInteger, UnsignedInteger, UnsignedFloat,
-    SizedRangedList
+    SizedRangedList, UnsignedList, SizedUnsignedIntegerList
 )
 
 
@@ -295,8 +295,8 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     ----------
     ncol : UnsignedInteger, optional
         Number of axial column discretization cells. Default is 100.
-    npar : UnsignedInteger, optional
-        Number of discretization cells in the radial direction. Default is 5.
+    npar : UnsignedList, optional
+        List of number of discretization cells in the radial direction.
     par_geom : Switch, optional
         The geometry of the particles in the model.
         Valid values are 'SPHERE', 'CYLINDER', and 'SLAB'.
@@ -351,7 +351,8 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
 
     spatial_method = Constant(value='FV')
     ncol = UnsignedInteger(default=100)
-    npar = UnsignedInteger(default=5)
+    npar = UnsignedList()
+    # npar = SizedUnsignedIntegerList(size='particle_radius_length', default=5)     # TODO: Does this need default value and size?
 
     par_geom = Switch(
         default='SPHERE',
@@ -396,8 +397,14 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     @property
     def par_disc_vector_length(self):
         """int: Number of entries in the particle discretization vector."""
-        return self.npar + 1
-
+        return sum([n + 1 for n in self.npar])
+    
+    # TODO: This would define size of list, is this required?
+    # @property
+    # def particle_radius_length(self):
+    #     """int: Number of entries in the particle."""
+    #     # return len(self.particle_radius)
+    #     return 5
 
 class GRMDiscretizationDG(DGMixin):
     """Discretization parameters of the DG version of the GRM.
