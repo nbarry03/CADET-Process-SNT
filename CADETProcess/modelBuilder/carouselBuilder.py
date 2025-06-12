@@ -200,6 +200,7 @@ class CarouselBuilder(Structure):
 
     @property
     def columns(self) -> Tuple[Column]:
+        """Tuple[Column]: Columns in the carousel system."""
         return self._columns
 
     @column.setter
@@ -294,7 +295,8 @@ class CarouselBuilder(Structure):
         """Add units to flow_sheet."""
         col_index = 0
 
-        def add_zone(zone: ZoneBaseClass):
+        def add_zone(zone: ZoneBaseClass) -> None:
+            """Add a zone and its columns and subunits to the flow sheet."""
             nonlocal col_index
             # Add zone inlet/outlet units
             flow_sheet.add_unit(zone.inlet_unit)
