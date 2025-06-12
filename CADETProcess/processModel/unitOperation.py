@@ -840,8 +840,10 @@ class LumpedRateModelWithPores(TubularReactorBase):
         Porosity of the bed
     particle_porosity : UnsignedFloat between 0 and 1.
         Porosity of particles.
-    particle_radius : UnsignedFloat
-        Radius of the particles.
+    particle_radius : UnsignedList. Length depends on number of particle types.
+        List of radii of the particles.
+    par_type_volfrac: List of unsigned floats. Length depends on number of particle types.
+        Volume fractions of the particle types.
     film_diffusion : List of unsigned floats. Length depends on n_comp.
         Diffusion rate for components in pore volume.
     pore_accessibility : List of unsigned floats. Length depends on n_comp.
@@ -863,15 +865,17 @@ class LumpedRateModelWithPores(TubularReactorBase):
 
     bed_porosity = UnsignedFloat(ub=1)
     particle_porosity = UnsignedFloat(ub=1)
-    particle_radius = UnsignedFloat()
-    film_diffusion = SizedUnsignedList(size='n_comp')
-    pore_accessibility = SizedUnsignedList(ub=1, size='n_comp', default=1)
+    particle_radius = FloatList(lb=0)
+    par_type_volfrac = FloatList(lb=0, ub=1)
+    film_diffusion = SizedUnsignedList(size="n_comp")
+    pore_accessibility = SizedUnsignedList(ub=1, size="n_comp", default=1)
     _parameters = [
-        'bed_porosity',
-        'particle_porosity',
-        'particle_radius',
-        'film_diffusion',
-        'pore_accessibility',
+        "bed_porosity",
+        "particle_porosity",
+        "particle_radius",
+        "par_type_volfrac",
+        "film_diffusion",
+        "pore_accessibility",
     ]
 
     _section_dependent_parameters = \

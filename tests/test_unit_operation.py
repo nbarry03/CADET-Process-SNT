@@ -24,6 +24,8 @@ volume = cross_section_area * length
 
 bed_porosity = 0.3
 particle_porosity = 0.6
+particle_radius = [1e-4]
+par_type_volfrac = [1]
 total_porosity = bed_porosity + (1 - bed_porosity) * particle_porosity
 const_solid_volume = volume * (1 - total_porosity)
 init_liquid_volume = volume * total_porosity
@@ -65,14 +67,35 @@ class Test_Unit_Operation(unittest.TestCase):
     def create_tubular_reactor(self):
         tube = TubularReactor(self.component_system, name='test')
 
-        tube.length = length
-        tube.diameter = diameter
-        tube.axial_dispersion = axial_dispersion
+@pytest.fixture
+def lrmp(component_system):
+    lrmp = LumpedRateModelWithPores(component_system, name="test_lrmp")
+    lrmp.length = length
+    lrmp.diameter = diameter
+    lrmp.axial_dispersion = axial_dispersion
+    lrmp.bed_porosity = bed_porosity
+    lrmp.particle_radius = particle_radius
+    lrmp.par_type_volfrac = par_type_volfrac
+    lrmp.particle_porosity = particle_porosity
+    lrmp.film_diffusion = [film_diffusion_0, film_diffusion_1]
+    return lrmp
 
         return tube
 
-    def create_MCT(self, components):
-        mct = MCT(ComponentSystem(components), nchannel=3, name='test')
+@pytest.fixture
+def grm(components=2):
+    grm = GeneralRateModel(ComponentSystem(components), name="test_grm")
+    grm.length = length
+    grm.diameter = diameter
+    grm.axial_dispersion = axial_dispersion
+    grm.bed_porosity = bed_porosity
+    grm.particle_radius = particle_radius
+    grm.par_type_volfrac = par_type_volfrac
+    grm.particle_porosity = particle_porosity
+    grm.film_diffusion = [film_diffusion_0, film_diffusion_1]
+    grm.pore_diffusion = [pore_diffusion_0, pore_diffusion_1]
+    grm.discretization.npar = [5]
+    return grm
 
         mct.length = length
         mct.channel_cross_section_areas = channel_cross_section_areas
@@ -93,9 +116,243 @@ class Test_Unit_Operation(unittest.TestCase):
 
         return lrmwop
 
-    def create_lrmwp(self):
-        lrmwp = LumpedRateModelWithPores(
-            self.component_system, name='test'
+    if "cross_section_area" in expected_geometry:
+        assert unit.cross_section_area == expected_geometry["cross_section_area"]
+
+        unit.cross_section_area = cross_section_area / 2
+        assert np.isclose(unit.diameter, diameter / (2**0.5))
+
+
+@pytest.mark.parametrize(
+    "input_c, expected_c",
+    [
+        (1, np.array([[1, 0, 0, 0], [1, 0, 0, 0]])),
+        ([1, 1], np.array([[1, 0, 0, 0], [1, 0, 0, 0]])),
+        ([1, 2], np.array([[1, 0, 0, 0], [2, 0, 0, 0]])),
+        ([[1, 0], [2, 0]], np.array([[1, 0, 0, 0], [2, 0, 0, 0]])),
+        ([[1, 2], [3, 4]], np.array([[1, 2, 0, 0], [3, 4, 0, 0]])),
+    ],
+)
+def test_polynomial_inlet_concentration(inlet, input_c, expected_c):
+    inlet.c = input_c
+    np.testing.assert_equal(inlet.c, expected_c)
+
+
+@pytest.mark.parametrize(
+    "unit_operation, input_flow_rate, expected_flow_rate",
+    [
+        ("inlet", 1, np.array([1, 0, 0, 0])),
+        ("inlet", [1, 0], np.array([1, 0, 0, 0])),
+        ("inlet", [1, 1], np.array([1, 1, 0, 0])),
+        ("cstr", 1, np.array([1, 0, 0, 0])),
+        ("cstr", [1, 0], np.array([1, 0, 0, 0])),
+        ("cstr", [1, 1], np.array([1, 1, 0, 0])),
+    ],
+)
+def test_polynomial_flow_rate(
+    unit_operation, input_flow_rate, expected_flow_rate, request
+):
+    unit = request.getfixturevalue(unit_operation)
+    unit.flow_rate = input_flow_rate
+    np.testing.assert_equal(unit.flow_rate, expected_flow_rate)
+
+
+@pytest.mark.parametrize(
+    "unit_operation, expected_parameters",
+    [
+        (
+            "cstr",
+            {
+                "flow_rate": np.array([1, 0, 0, 0]),
+                "init_liquid_volume": init_liquid_volume,
+                "flow_rate_filter": 0,
+                "c": [0, 0],
+                "q": None,
+                "const_solid_volume": const_solid_volume,
+            },
+        ),
+        (
+            "tubular_reactor",
+            {
+                "length": length,
+                "diameter": diameter,
+                "axial_dispersion": [axial_dispersion, axial_dispersion],
+                "flow_direction": flow_direction,
+                "c": [0, 0],
+                "discretization": {
+                    "ncol": 100,
+                    "use_analytic_jacobian": True,
+                    "reconstruction": "WENO",
+                    "weno": {"boundary_model": 0, "weno_eps": 1e-10, "weno_order": 3},
+                    "consistency_solver": {
+                        "solver_name": "LEVMAR",
+                        "init_damping": 0.01,
+                        "min_damping": 0.0001,
+                        "max_iterations": 50,
+                        "subsolvers": "LEVMAR",
+                    },
+                },
+            },
+        ),
+        (
+            "lrm",
+            {
+                "length": length,
+                "diameter": diameter,
+                "total_porosity": total_porosity,
+                "axial_dispersion": [axial_dispersion, axial_dispersion],
+                "flow_direction": flow_direction,
+                "c": [0, 0],
+                "q": None,
+                "discretization": {
+                    "ncol": 100,
+                    "use_analytic_jacobian": True,
+                    "reconstruction": "WENO",
+                    "weno": {"boundary_model": 0, "weno_eps": 1e-10, "weno_order": 3},
+                    "consistency_solver": {
+                        "solver_name": "LEVMAR",
+                        "init_damping": 0.01,
+                        "min_damping": 0.0001,
+                        "max_iterations": 50,
+                        "subsolvers": "LEVMAR",
+                    },
+                },
+            },
+        ),
+        (
+            "lrmp",
+            {
+                "length": length,
+                "diameter": diameter,
+                "bed_porosity": bed_porosity,
+                "axial_dispersion": [axial_dispersion, axial_dispersion],
+                "pore_accessibility": [1, 1],
+                "film_diffusion": [film_diffusion_0, film_diffusion_1],
+                "particle_radius": particle_radius,
+                "par_type_volfrac": par_type_volfrac,
+                "particle_porosity": particle_porosity,
+                "flow_direction": flow_direction,
+                "c": [0, 0],
+                "cp": [0, 0],
+                "q": None,
+                "discretization": {
+                    "ncol": 100,
+                    "par_geom": "SPHERE",
+                    "use_analytic_jacobian": True,
+                    "gs_type": True,
+                    "max_krylov": 0,
+                    "max_restarts": 10,
+                    "schur_safety": 1e-08,
+                    "reconstruction": "WENO",
+                    "weno": {"boundary_model": 0, "weno_eps": 1e-10, "weno_order": 3},
+                    "consistency_solver": {
+                        "solver_name": "LEVMAR",
+                        "init_damping": 0.01,
+                        "min_damping": 0.0001,
+                        "max_iterations": 50,
+                        "subsolvers": "LEVMAR",
+                    },
+                },
+            },
+        ),
+        (
+            "grm",
+            {
+                "length": length,
+                "diameter": diameter,
+                "bed_porosity": bed_porosity,
+                "axial_dispersion": [axial_dispersion, axial_dispersion],
+                "pore_accessibility": [1, 1],
+                "film_diffusion": [film_diffusion_0, film_diffusion_1],
+                "particle_radius": particle_radius,
+                "par_type_volfrac": par_type_volfrac,
+                "particle_porosity": particle_porosity,
+                "pore_diffusion": [pore_diffusion_0, pore_diffusion_1],
+                "surface_diffusion": None,
+                "flow_direction": flow_direction,
+                "c": [0, 0],
+                "cp": [0, 0],
+                "q": None,
+                "discretization": {
+                    "ncol": 100,
+                    "par_geom": "SPHERE",
+                    "npar": [5],
+                    "par_disc_type": "EQUIDISTANT_PAR",
+                    "par_boundary_order": 2,
+                    "fix_zero_surface_diffusion": False,
+                    "use_analytic_jacobian": True,
+                    "gs_type": True,
+                    "max_krylov": 0,
+                    "max_restarts": 10,
+                    "schur_safety": 1e-08,
+                    "reconstruction": "WENO",
+                    "weno": {"boundary_model": 0, "weno_eps": 1e-10, "weno_order": 3},
+                    "consistency_solver": {
+                        "solver_name": "LEVMAR",
+                        "init_damping": 0.01,
+                        "min_damping": 0.0001,
+                        "max_iterations": 50,
+                        "subsolvers": "LEVMAR",
+                    },
+                },
+            },
+        ),
+        (
+            "mct",
+            {
+                "nchannel": nchannel,
+                "length": length,
+                "channel_cross_section_areas": channel_cross_section_areas,
+                "axial_dispersion": nchannel * [axial_dispersion],
+                "exchange_matrix": exchange_matrix,
+                "flow_direction": 1,
+                "c": [[0, 0, 0]],
+                "discretization": {
+                    "ncol": 100,
+                    "use_analytic_jacobian": True,
+                    "reconstruction": "WENO",
+                    "weno": {"boundary_model": 0, "weno_eps": 1e-10, "weno_order": 3},
+                    "consistency_solver": {
+                        "solver_name": "LEVMAR",
+                        "init_damping": 0.01,
+                        "min_damping": 0.0001,
+                        "max_iterations": 50,
+                        "subsolvers": "LEVMAR",
+                    },
+                },
+            },
+        ),
+    ],
+)
+def test_parameters(unit_operation, expected_parameters, request):
+    unit = request.getfixturevalue(unit_operation)
+    np.testing.assert_equal(expected_parameters, unit.parameters)
+
+
+@pytest.mark.parametrize(
+    "unit_operation, flow_rate, expected_velocity",
+    [
+        ("tubular_reactor", 2, 2),
+        ("lrmp", 2, 4),
+        ("tubular_reactor", 0, ZeroDivisionError),
+        ("lrmp", 0, ZeroDivisionError),
+    ],
+)
+def test_interstitial_velocity(unit_operation, flow_rate, expected_velocity, request):
+    unit = request.getfixturevalue(unit_operation)
+    unit.length = 1
+    unit.cross_section_area = 1
+    unit.axial_dispersion = 3 if unit_operation == "tubular_reactor" else [3, 2]
+
+    if unit_operation == "lrmp":
+        unit.bed_porosity = 0.5
+
+    if expected_velocity is ZeroDivisionError:
+        with pytest.raises(ZeroDivisionError):
+            unit.calculate_interstitial_velocity(flow_rate)
+    else:
+        assert np.isclose(
+            unit.calculate_interstitial_velocity(flow_rate), expected_velocity
         )
 
         lrmwp.length = length
