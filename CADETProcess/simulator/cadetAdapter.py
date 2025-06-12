@@ -1360,10 +1360,10 @@ unit_parameters_map = {
         },
         "fixed": {
             "COL_DISPERSION_MULTIPLEX": 3,
-            "FILM_DIFFUSION_MULTIPLEX": 3,
-            "PAR_DIFFUSION_MULTIPLEX": 3,
-            "PAR_SURFDIFFUSION_MULTIPLEX": 3,
-            "PORE_ACCESSIBILITY_MULTIPLEX": 3,
+            "FILM_DIFFUSION_MULTIPLEX": 0,
+            "PAR_DIFFUSION_MULTIPLEX": 0,
+            "PAR_SURFDIFFUSION_MULTIPLEX": 0,
+            "PORE_ACCESSIBILITY_MULTIPLEX": 0,
         },
     },
     "LumpedRateModelWithPores": {

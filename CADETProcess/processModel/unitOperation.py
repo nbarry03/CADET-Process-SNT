@@ -8,6 +8,7 @@ import numpy as np
 from CADETProcess import CADETProcessError
 from CADETProcess.dataStructure import (
     Constant,
+    FloatList,
     NdPolynomial,
     Polynomial,
     SizedFloatList,
@@ -1067,11 +1068,11 @@ class GeneralRateModel(ChromatographicColumnBase):
         Porosity of the bed
     particle_porosity : UnsignedFloat between 0 and 1.
         Porosity of particles.
-    particle_radius : UnsignedList.
+    particle_radius : UnsignedList. Length depends on number of particle types.
         List of radii of the particles.
     film_diffusion : List of unsigned floats. Length depends on n_comp.
         Film diffusion coefficients for each component.
-    par_type_volfrac: List of unsigned floats. Length depends on number of particle radii.
+    par_type_volfrac: List of unsigned floats. Length depends on number of particle types.
         Volume fractions of the particle types.
     pore_accessibility : List of unsigned floats. Length depends on n_comp.
         Accessibility of pores for components.
@@ -1096,8 +1097,8 @@ class GeneralRateModel(ChromatographicColumnBase):
 
     bed_porosity = UnsignedFloat(ub=1)
     particle_porosity = UnsignedFloat(ub=1)
-    particle_radius = UnsignedList()
-    par_type_volfrac = UnsignedList(ub=1)
+    particle_radius = FloatList(lb=0)
+    par_type_volfrac = FloatList(lb=0, ub=1)
     film_diffusion = SizedUnsignedList(size='n_comp')
     pore_accessibility = SizedUnsignedList(ub=1, size='n_comp', default=1)
     pore_diffusion = SizedUnsignedList(size='n_comp')

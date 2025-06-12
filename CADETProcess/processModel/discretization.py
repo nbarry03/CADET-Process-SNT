@@ -20,6 +20,7 @@ from CADETProcess.dataStructure import (
     SizedRangedList,
     Structure,
     Switch,
+    TypedList,
     UnsignedFloat,
     UnsignedInteger,
     frozen_attributes,
@@ -368,8 +369,7 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
 
     spatial_method = Constant(value="FV")
     ncol = UnsignedInteger(default=100)
-    npar = UnsignedList()
-    # npar = SizedUnsignedIntegerList(size='particle_radius_length', default=5)     # TODO: Does this need default value and size?
+    npar = TypedList(dtype=int)
 
     par_geom = Switch(default="SPHERE", valid=["SPHERE", "CYLINDER", "SLAB"])
     par_disc_type = Switch(
@@ -428,12 +428,6 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
         """int: Number of entries in the particle discretization vector."""
         return sum([n + 1 for n in self.npar])
     
-    # TODO: This would define size of list, is this required?
-    # @property
-    # def particle_radius_length(self):
-    #     """int: Number of entries in the particle."""
-    #     # return len(self.particle_radius)
-    #     return 5
 
 class GRMDiscretizationDG(DGMixin):
     """
