@@ -54,7 +54,8 @@ def setup_process(unit_type):
         lrmp.length = 1
         lrmp.diameter = 1e-2
         lrmp.bed_porosity = 0.7
-        lrmp.particle_radius = 1e-6
+        lrmp.particle_radius = [1e-6]
+        lrmp.par_type_volfrac = [1]
         lrmp.particle_porosity = 0.7
         lrmp.axial_dispersion = 1e-6
         lrmp.film_diffusion = 2 * [1e-3]
@@ -66,7 +67,8 @@ def setup_process(unit_type):
         grm.length = 1
         grm.diameter = 1e-2
         grm.bed_porosity = 0.7
-        grm.particle_radius = 1e-6
+        grm.particle_radius = [1e-6]
+        grm.par_type_volfrac = [1]
         grm.particle_porosity = 0.7
         grm.axial_dispersion = 1e-6
         grm.film_diffusion = 2 * [1e-3]
