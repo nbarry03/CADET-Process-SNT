@@ -571,7 +571,7 @@ class ExtendedMobilePhaseModulator(BindingBaseClass):
     adsorption_rate = SizedUnsignedList(size='n_comp')
     desorption_rate = SizedUnsignedList(size='n_comp')
     capacity = SizedUnsignedList(size='n_comp')
-    ion_exchange_characteristic = SizedList(size='n_comp')
+    ion_exchange_characteristic = SizedFloatList(size='n_comp')
     beta = ion_exchange_characteristic
     hydrophobicity = SizedList(size='n_comp')
     gamma = hydrophobicity
