@@ -1379,14 +1379,15 @@ unit_parameters_map = {
             "FILM_DIFFUSION": "film_diffusion",
             "PAR_POROSITY": "particle_porosity",
             "PAR_RADIUS": "particle_radius",
+            'PAR_TYPE_VOLFRAC': "par_type_volfrac",
             "PORE_ACCESSIBILITY": "pore_accessibility",
             "CROSS_SECTION_AREA": "cross_section_area",
             "VELOCITY": "flow_direction",
         },
         "fixed": {
             "COL_DISPERSION_MULTIPLEX": 3,
-            "FILM_DIFFUSION_MULTIPLEX": 3,
-            "PORE_ACCESSIBILITY_MULTIPLEX": 3,
+            "FILM_DIFFUSION_MULTIPLEX": 0,
+            "PORE_ACCESSIBILITY_MULTIPLEX": 0,
         },
     },
     "LumpedRateModelWithoutPores": {
