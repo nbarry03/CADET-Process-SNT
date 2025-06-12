@@ -73,6 +73,7 @@ def setup_process(unit_type):
         grm.axial_dispersion = 1e-6
         grm.film_diffusion = 2 * [1e-3]
         grm.pore_diffusion = 2 * [1e-3]
+        grm.discretization.npar = [5]
 
         unit = grm
     else:
