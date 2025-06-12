@@ -1,7 +1,6 @@
 from copy import deepcopy
 from functools import wraps
-from typing import Any, Optional, NoReturn, List, Tuple, Iterable
-import warnings
+from typing import Any, Iterable, List, NoReturn, Optional, Tuple, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -30,6 +29,7 @@ __all__ = [
     "LangmuirSMBBuilder",
 ]
 
+
 class Column:
     def __init__(self, index: int, subunits: List[TubularReactorBase]) -> NoReturn:
         """
@@ -44,16 +44,16 @@ class Column:
         """
         self.index = index
         self.subunits = subunits
-    
+
     @property
     def top(self) -> TubularReactorBase:
         return self.subunits[0]
-    
+
     @property
     def bottom(self) -> TubularReactorBase:
         return self.subunits[-1]
-     
-     
+
+
 class ZoneBaseClass(UnitBaseClass):
     """Base class for a multi-column zone with configurable columns and flow directions.
 
@@ -197,17 +197,19 @@ class CarouselBuilder(Structure):
     def column(self) -> Tuple[TubularReactorBase, ...]:
         """Tuple[TubularReactorBase]: The column template for all zones."""
         return self._column
-    
+
     @property
     def columns(self) -> Tuple[Column]:
         return self._columns
 
     @column.setter
-    def column(self, column: TubularReactorBase | Iterable[TubularReactorBase]) -> NoReturn:
+    def column(
+        self, column: TubularReactorBase | Iterable[TubularReactorBase]
+    ) -> NoReturn:
         if isinstance(column, TubularReactorBase):
             column = (column,)
-        elif (isinstance(column, Iterable)
-              and all(isinstance(c, TubularReactorBase) for c in column)
+        elif isinstance(column, Iterable) and all(
+            isinstance(c, TubularReactorBase) for c in column
         ):
             column = tuple(column)
         else:
@@ -308,16 +310,14 @@ class CarouselBuilder(Structure):
                         f"column_"
                         f"{sub.name + '_' if len(self.column) > 1 else ''}"
                         f"{col_index}"
-                        )
+                    )
                     if zone.initial_state is not None:
                         sub.initial_state = zone.initial_state[i_col]
                     flow_sheet.add_unit(sub)
                     subunits.append(sub)
 
                 # Aggregate Column objects
-                self.columns.append(
-                    Column(index = col_index, subunits = subunits)
-                )
+                self.columns.append(Column(index=col_index, subunits=subunits))
                 col_index += 1
 
         for unit in self.flow_sheet.units:
@@ -359,9 +359,9 @@ class CarouselBuilder(Structure):
         # Connect zone inlets/outlets to column tops/bottoms respectively
         for zone in self.zones:
             for col in self.columns:
-                    flow_sheet.add_connection(zone.inlet_unit, col.top)
-                    flow_sheet.add_connection(col.bottom, zone.outlet_unit)
-        
+                flow_sheet.add_connection(zone.inlet_unit, col.top)
+                flow_sheet.add_connection(col.bottom, zone.outlet_unit)
+
         # Connect each bottom of each column to the top of next
         cols = self.columns
         for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
@@ -379,7 +379,6 @@ class CarouselBuilder(Structure):
         
         # Connect each bottom of each column to the top of next
         self._add_ring_connections(flow_sheet)
-
 
     def build_process(self) -> Process:
         """
@@ -411,12 +410,10 @@ class CarouselBuilder(Structure):
             position_counter = 0
 
             for i_zone, zone in enumerate(self.zones):
-
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
                 rotated_indices = self.column_indices_at_state(
-                    col_indices,
-                    carousel_state
+                    col_indices, carousel_state
                 )
                 cols = [self.columns[i] for i in rotated_indices]
 
@@ -424,7 +421,7 @@ class CarouselBuilder(Structure):
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
                         f"flow_sheet.output_states.{zone.inlet_unit}",
-                        cols[0].index
+                        cols[0].index,
                     )
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
@@ -433,13 +430,11 @@ class CarouselBuilder(Structure):
                     # Current column either feeds next column or goes
                     # to outlet
                     for seq_i, col in enumerate(cols):
-                        dest = (self.n_zones
-                                if seq_i < zone.n_columns - 1
-                                else i_zone)
+                        dest = self.n_zones if seq_i < zone.n_columns - 1 else i_zone
                         evt = process.add_event(
                             f"column_{col.index}_{carousel_state}",
                             f"flow_sheet.output_states.{col.bottom.name}",
-                            dest
+                            dest,
                         )
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
@@ -458,24 +453,20 @@ class CarouselBuilder(Structure):
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
                         f"flow_sheet.output_states.{zone.inlet_unit}",
-                        split
+                        split,
                     )
                     process.add_event_dependency(
-                        evt.name,
-                        "switch_time",
-                        [carousel_state]
+                        evt.name, "switch_time", [carousel_state]
                     )
-                    
+
                     for col in cols:
                         evt = process.add_event(
                             f"column_{col.index}_{carousel_state}",
                             f"flow_sheet.output_states.{col.bottom.name}",
-                            i_zone
+                            i_zone,
                         )
                         process.add_event_dependency(
-                            evt.name,
-                            "switch_time",
-                            [carousel_state]
+                            evt.name, "switch_time", [carousel_state]
                         )
 
                 # Set flow direction
@@ -483,12 +474,10 @@ class CarouselBuilder(Structure):
                     evt = process.add_event(
                         f"column_{col.index}_{carousel_state}_velocity",
                         f"flow_sheet.{col.bottom.name}.flow_direction",
-                        zone.flow_direction
+                        zone.flow_direction,
                     )
                     process.add_event_dependency(
-                        evt.name,
-                        "switch_time",
-                        [carousel_state]
+                        evt.name, "switch_time", [carousel_state]
                     )
 
                 position_counter += zone.n_columns
@@ -1523,7 +1512,7 @@ class CarouselSolutionBulk(SolutionBase):
         return self.simulation_results.solution.column_0.bulk.axial_coordinates
 
     @property
-    def radial_coordinates(self):
+    def radial_coordinates(self) -> npt.ArrayLike:
         radial_coordinates = (
             self.simulation_results.solution.column_0.bulk.radial_coordinates
         )
