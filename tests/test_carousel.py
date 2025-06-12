@@ -243,7 +243,7 @@ class Test_Carousel(unittest.TestCase):
                     ),
                     msg=f'{serial_zone.inlet_unit.name} connection to {col.top.name}'
                     )
-        
+
         # Column subunits should be chained in order
         for col in builder.columns:
             with self.subTest(zone='serial', connection='subunit chain', column=col.index):
@@ -306,7 +306,11 @@ class Test_Carousel(unittest.TestCase):
 
         # Bottom of each column should connect to zone outlet
         for col in builder.columns:
-            with self.subTest(zone='parallel', connection='column to zone outlet', column=col.index):
+            with self.subTest(
+                zone='parallel',
+                connection='column to zone outlet',
+                column=col.index
+                ):
                 self.assertTrue(
                     flow_sheet.connection_exists(
                         col.bottom.name,
@@ -492,7 +496,7 @@ class Test_Carousel(unittest.TestCase):
         builder = self.create_parallel()
         process = builder.build_process()
         parallel_zone = builder.zones[0]
-        t0= 0.0
+        t0 = 0.0
 
         # Inlet and outlet are almost equal
         for port in (parallel_zone.inlet_unit.name, parallel_zone.outlet_unit.name):
@@ -554,10 +558,10 @@ class Test_Carousel(unittest.TestCase):
 
         checks = [
             # (column index, time, expected flow_direction)
-            (0, 0,  1),
+            (0, 0, 1),
             (2, 0, -1),
             (0, builder.switch_time, -1),
-            (2, builder.switch_time,  1)
+            (2, builder.switch_time, 1)
         ]
 
         for col_index, t, expected in checks:
@@ -570,7 +574,7 @@ class Test_Carousel(unittest.TestCase):
                 np.testing.assert_almost_equal(
                     flow_direction, expected
                     )
-    
+
     def test_single_subunit_column(self):
         """Test a system with a single column subunit."""
         builder = self.create_serial()
@@ -586,7 +590,7 @@ class Test_Carousel(unittest.TestCase):
         # Each column has a single subunit
         for col in cols:
             with self.subTest(column=col.index):
-                self.assertEqual(len(col.subunits),1)
+                self.assertEqual(len(col.subunits), 1)
 
         # No intracolumn chaining exists
         for col in cols:
@@ -596,7 +600,7 @@ class Test_Carousel(unittest.TestCase):
                     flow_sheet.connection_exists(name, name),
                     msg=f'Unexpected self-chain on {name}'
                 )
-        
+
         # Zone inlet connects to subunit, subunit to zone outlet
         for col in cols:
             sub = col.subunits[0]
@@ -627,8 +631,6 @@ class Test_Carousel(unittest.TestCase):
                     ),
                     msg=f'{this_col_name} connection to {next_col_name}'
                 )
-
-
 
     def test_simulation(self):
         builder = self.create_serial()
