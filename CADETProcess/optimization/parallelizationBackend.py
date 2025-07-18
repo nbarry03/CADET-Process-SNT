@@ -185,3 +185,60 @@ class Pathos(ParallelizationBackendBase):
         with pathos.pools.ProcessPool(ncpus=self.n_cores) as pool:
             results = pool.map(function, population)
         return results
+
+
+try:
+    from dask.distributed import Client, LocalCluster
+
+    __all__.append("Dask")
+except ModuleNotFoundError:
+    pass
+
+
+class Dask(ParallelizationBackendBase):
+    """Parallelization backend using the dask library."""
+
+    def __init__(self, scheduler_address: str | None = None, **kwargs) -> None:
+        """
+        Initialize the parallelization backend with a Dask client.
+
+        Parameters
+        ----------
+            scheduler_address (str, optional): The address of the Dask scheduler to connect to. 
+                Defaults to "tcp://localhost:8786".
+            **kwargs: Additional keyword arguments passed to the superclass initializer.
+
+        Returns
+        -------
+        None
+        """
+        super().__init__(**kwargs)
+
+        if scheduler_address is None:
+            self.cluster = LocalCluster(n_workers=self._n_cores, threads_per_worker=1)
+            self.client = Client(self.cluster)
+        else:
+            self.client = Client(address=scheduler_address)
+            # Core management delegated to cluster config, n_cores not used
+            # TODO: Add warning when n_cores != n workers cores
+
+    def evaluate(self, function: callable, population: Iterable) -> list:
+        """
+        Evaluate the function in parallalel for all individuals of the population.
+
+        Parameters
+        ----------
+        function : callable
+            The function of interest to be evaluated for the population.
+        population : Iterable
+            A collection of individuals at which the function is to be evaluated.
+
+        Returns
+        -------
+        list
+            List of results of function evaluations.
+        """
+        futures = self.client.map(function, population)
+        results = self.client.gather(futures)
+
+        return results
