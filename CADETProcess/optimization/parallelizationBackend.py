@@ -198,7 +198,8 @@ class Dask(ParallelizationBackendBase):
 
         Parameters
         ----------
-            scheduler_address (str|None, optional): The address of the Dask scheduler to connect to (defaults to None).
+            scheduler_address (str | None, optional): The address of the Dask scheduler to connect
+                to (defaults to None).
             **kwargs: Additional keyword arguments.
 
         Returns
