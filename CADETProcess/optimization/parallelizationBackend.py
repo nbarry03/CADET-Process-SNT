@@ -204,9 +204,8 @@ class Dask(ParallelizationBackendBase):
 
         Parameters
         ----------
-            scheduler_address (str, optional): The address of the Dask scheduler to connect to. 
-                Defaults to "tcp://localhost:8786".
-            **kwargs: Additional keyword arguments passed to the superclass initializer.
+            scheduler_address (str|None, optional): The address of the Dask scheduler to connect to (defaults to None).
+            **kwargs: Additional keyword arguments.
 
         Returns
         -------
@@ -218,6 +217,7 @@ class Dask(ParallelizationBackendBase):
             self.cluster = LocalCluster(n_workers=self._n_cores, threads_per_worker=1)
             self.client = Client(self.cluster)
         else:
+            print(f"Creating client at {scheduler_address}")
             self.client = Client(address=scheduler_address)
             # Core management delegated to cluster config, n_cores not used
             # TODO: Add warning when n_cores != n workers cores
@@ -238,6 +238,7 @@ class Dask(ParallelizationBackendBase):
         list
             List of results of function evaluations.
         """
+        print("Evaluating")
         futures = self.client.map(function, population)
         results = self.client.gather(futures)
 
