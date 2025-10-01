@@ -17,15 +17,25 @@ from .peaks import find_peaks, find_breakthroughs
 
 
 __all__ = [
-    'DifferenceBase',
-    'calculate_sse', 'calculate_rmse',
-    'SSE', 'RMSE', 'NRMSE',
-    'Norm', 'L1', 'L2',
-    'AbsoluteArea', 'RelativeArea',
-    'Shape',
-    'PeakHeight', 'PeakPosition',
-    'BreakthroughHeight', 'BreakthroughPosition',
-    'FractionationSSE',
+    "DifferenceBase",
+    "calculate_sse",
+    "calculate_rmse",
+    "SSE",
+    "RMSE",
+    "NRMSE",
+    "Norm",
+    "L1",
+    "L2",
+    "AbsoluteArea",
+    "RelativeArea",
+    "Shape",
+    "ShapeFront",
+    "PeakHeight",
+    "PeakPosition",
+    "BreakthroughHeight",
+    "BreakthroughPosition",
+    "FractionationSSE",
+    "ThresholdPeak"
 ]
 
 
@@ -1031,3 +1041,83 @@ class FractionationSSE(DifferenceBase):
         sse = calculate_sse(solution.solution, self.reference.solution)
 
         return sse
+
+
+def threshold_peak(
+        solution:np.ndarray,
+        reference:np.ndarray,
+        bt_start: int,
+        bt_end: int
+        ) -> float:
+    sliced_solution = solution[bt_start:bt_end]
+    sliced_reference = reference[bt_start:bt_end]
+
+    def get_points(ads_array):
+        min = ads_array.min()
+        max = ads_array.max()
+        return min, max
+
+    # Get bt min and max, calculate bt height
+    solution_points = get_points(sliced_solution)
+    reference_points = get_points(sliced_reference)
+
+    # Get peak height after breakthrough
+    # Delta is between peak height and breakthrough height
+    def get_delta(des_array, bt_max):
+        peak_height = des_array.max()
+        return peak_height - bt_max
+
+    solution_delta = get_delta(solution[bt_end:], solution_points[1])
+    reference_delta = get_delta(reference[bt_end:], reference_points[1])
+
+    # Calculate bt NRMSE
+    # rmse = calculate_rmse(sliced_solution, sliced_reference)
+    # nrmse = rmse / np.max(sliced_reference, axis=0)
+
+    # return np.array([
+    #     float(abs(solution_points[0] - reference_points[0])),
+    #     float(abs(solution_points[1] - reference_points[1])),
+    #     float(nrmse),
+    #     float(abs(solution_delta - reference_delta))
+    # ])
+    return float(abs(solution_delta - reference_delta))
+
+
+class ThresholdPeak(DifferenceBase):
+    # TODO: Docs
+    _valid_references = (SolutionIO, ReferenceIO)
+
+    def __init__(
+            self,
+            *args: Any,
+            bt_start: int = 736,        # Temp hardcoded
+            bt_end: int = 3713,         # Temp hardcoded
+            **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.bt_start = bt_start
+        self.bt_end = bt_end
+
+    # def __str__(self):
+    #     return "ThresholdPeak"
+
+    @property
+    def n_metrics(self) -> int:
+        return 1
+
+    # @property
+    # def labels(self) -> list:
+    #     return [
+    #         # "breakthrough_min",
+    #         # "breakthrough_max",
+    #         # "breakthrough_nrmse",
+    #         "peak_delta"
+    #         ]
+
+    def _evaluate(self, solution: SolutionIO) -> np.ndarray:
+        return threshold_peak(
+            solution.solution,
+            self.reference.solution,
+            self.bt_start,
+            self.bt_end
+        )
