@@ -848,10 +848,10 @@ class SMBBuilder(CarouselBuilder):
         Vc = self.column.volume
         et = self.column.total_porosity
 
-        Q_I = Vc*(m1*(1-et)+et)/switch_time     # Flow rate Zone I
-        Q_II = Vc*(m2*(1-et)+et)/switch_time    # Flow rate Zone II
-        Q_III = Vc*(m3*(1-et)+et)/switch_time   # Flow rate Zone III
-        Q_IV = Vc*(m4*(1-et)+et)/switch_time    # Flow rate Zone IV
+        Q_I = Vc * (m1 * (1 - et) + et) / switch_time     # Flow rate Zone I
+        Q_II = Vc * (m2 * (1 - et) + et) / switch_time    # Flow rate Zone II
+        Q_III = Vc * (m3 * (1 - et) + et) / switch_time   # Flow rate Zone III
+        Q_IV = Vc * (m4 * (1 - et) + et) / switch_time    # Flow rate Zone IV
 
         return [Q_I, Q_II, Q_III, Q_IV]
 
@@ -925,11 +925,11 @@ class SMBBuilder(CarouselBuilder):
         raise NotImplementedError("Subclass must implement this method.")
 
     def apply_safety_factor(
-            self,
-            m_opt: list,
-            *design_parameters: Any,
-            gamma: float | list[float]
-            ) -> Any:
+        self,
+        m_opt: list,
+        *design_parameters: Any,
+        gamma: float | list[float],
+    ) -> Any:
         """
         Apply a safety factor to the optimal zone flow rates.
 
@@ -1171,10 +1171,10 @@ class LinearSMBBuilder(SMBBuilder):
             )
 
     def get_design_parameters(
-            self,
-            binding_model: BindingBaseClass,
-            c_feed: np.ndarray
-            ) -> tuple[float, float]:
+        self,
+        binding_model: BindingBaseClass,
+        c_feed: np.ndarray,
+    ) -> tuple[float, float]:
         """
         Calculate Henry's constants (H) based on adsorption and desorption rates.
 
@@ -1202,10 +1202,10 @@ class LinearSMBBuilder(SMBBuilder):
         return HA, HB
 
     def calculate_m_opt(
-            self,
-            HA: float,
-            HB: float
-            ) -> list[float]:
+        self,
+        HA: float,
+        HB: float,
+    ) -> list[float]:
         """
         Calculate the optimal flow rates for SMB zones based on Henry's constants.
 
@@ -1276,10 +1276,11 @@ class LinearSMBBuilder(SMBBuilder):
         return [m1, m2, m3, m4]
 
     def _plot_triangle(
-            self, ax,
-            HA: float,
-            HB: float,
-            ) -> NoReturn:
+        self,
+        ax: Axes,
+        HA: float,
+        HB: float,
+    ) -> NoReturn:
         """
         Plot SMB triangle for linear isotherm.
 
@@ -1376,10 +1377,10 @@ class LangmuirSMBBuilder(SMBBuilder):
             )
 
     def get_design_parameters(
-            self,
-            binding_model: BindingBaseClass,
-            c_feed: np.ndarray
-            ) -> tuple[float, float]:
+        self,
+        binding_model: BindingBaseClass,
+        c_feed: np.ndarray,
+    ) -> tuple[float, float]:
         """
         Calculate the optimal flow rates for SMB zones based on the provided parameters.
 
@@ -1673,7 +1674,7 @@ class CarouselSolutionBulk(SolutionBase):
         return self.simulation_results.solution.column_0.bulk.axial_coordinates
 
     @property
-    def radial_coordinates(self):
+    def radial_coordinates(self) -> npt.ArrayLike:
         radial_coordinates = \
             self.simulation_results.solution.column_0.bulk.radial_coordinates
         )
@@ -1687,8 +1688,12 @@ class CarouselSolutionBulk(SolutionBase):
         return self.simulation_results.solution.column_0.bulk.time
 
     def plot_at_time(
-            self, t, overlay=None, y_min=None, y_max=None,
-            ax=None, lines=None):
+        self,
+        t: float,
+        y_min: Optional[float] = None,
+        y_max: Optional[float] = None,
+        axs: Optional[Axes] = None,
+    ) -> tuple[Figure, Axes]:
         """Plot bulk solution over space at given time.
 
         Parameters
@@ -1761,7 +1766,4 @@ class CarouselSolutionBulk(SolutionBase):
         for position, ax in enumerate(axs):
             ax.set_ylim((y_min, y_max))
 
-        if _lines is None:
-            _lines = lines
-
-        return axs, _lines
+        return fig, axs
