@@ -8,6 +8,7 @@ import numpy as np
 from CADETProcess import CADETProcessError
 from CADETProcess.dataStructure import (
     Constant,
+    FloatList,
     NdPolynomial,
     Polynomial,
     SizedFloatList,
@@ -1107,20 +1108,9 @@ class GeneralRateModel(ChromatographicColumnBase):
     pore_diffusion = SizedUnsignedList(size='n_comp')
     _surface_diffusion = SizedUnsignedList(size='n_bound_states')
     _parameters = [
-        "bed_porosity",
-        "particle_porosity",
-        "particle_radius",
-        "par_type_volfrac",
-        "film_diffusion",
-        "pore_accessibility",
-        "pore_diffusion",
-        "surface_diffusion",
-    ]
-    _section_dependent_parameters = TubularReactorBase._section_dependent_parameters + [
-        "film_diffusion",
-        "pore_accessibility",
-        "pore_diffusion",
-        "surface_diffusion",
+        'bed_porosity', 'particle_porosity', 'particle_radius',
+        'par_type_volfrac', 'film_diffusion', 'pore_accessibility',
+        'pore_diffusion', 'surface_diffusion'
     ]
     _section_dependent_parameters = TubularReactorBase._section_dependent_parameters + [
         "film_diffusion",

@@ -3,13 +3,14 @@ import unittest
 import numpy as np
 from CADETProcess.modelBuilder import (
     CarouselBuilder, SerialCarouselBuilder, ParallelZone, SerialZone
+)
 from CADETProcess.processModel import (
     ComponentSystem,
     Inlet,
     Linear,
     LumpedRateModelWithoutPores,
     Outlet,
-)    )
+)
 
 from CADETProcess.simulator import Cadet
 
@@ -860,7 +861,9 @@ class Test_SerialCarousel(unittest.TestCase):
                 )
             )
             self.assertTrue(
+                flow_sheet.connection_exists(
                 pipe_name, next_col.top.name
+                )
             )
 
         builder, _ = self.create_carousel(with_pipe=False)
@@ -886,7 +889,7 @@ class Test_SerialCarousel(unittest.TestCase):
         ):
             pipe = flow_sheet[f'pipe_{this_col.index}_{next_col.index}']
             expected = zone.initial_state[this_col.index]['c']
-            self.assertAlmostEqual(
+            self.assertEqual(
                 pipe.initial_state['c'], expected
             )
     
