@@ -453,22 +453,13 @@ class CarouselBuilder(Structure):
                 flow_sheet.add_connection(col.bottom, zone.outlet_unit)
 
         # Connect each bottom of each column to the top of next
+        self._add_ring_connections(flow_sheet)
+
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """Add connections between columns in a ring formation."""
         cols = self.columns
         for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
             flow_sheet.add_connection(this_col.bottom, next_col.top)
-
-    def _set_output_states(self, flow_sheet: FlowSheet) -> NoReturn:
-        for unit in self.flow_sheet.output_states:
-            output_state = self.flow_sheet.output_states[unit]
-
-        # Connect zone inlets/outlets to column tops/bottoms respectively
-        for zone in self.zones:
-            for col in self.columns:
-                    flow_sheet.add_connection(zone.inlet_unit, col.top)
-                    flow_sheet.add_connection(col.bottom, zone.outlet_unit)
-        
-        # Connect each bottom of each column to the top of next
-        self._add_ring_connections(flow_sheet)
 
     def _set_output_states(self, flow_sheet: FlowSheet) -> NoReturn:
         for unit in self.flow_sheet.output_states:
@@ -507,7 +498,6 @@ class CarouselBuilder(Structure):
         """Add events to process."""
         process.cycle_time = self.n_columns * self.switch_time
         process.add_duration("switch_time", self.switch_time)
-        process.add_duration("switch_time", self.switch_time)
 
         for carousel_state in range(self.n_columns):
             position_counter = 0
@@ -528,7 +518,6 @@ class CarouselBuilder(Structure):
                     )
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
-                        evt.name, "switch_time", [carousel_state]
                     )
 
                     # Current column either feeds next column or goes
@@ -541,7 +530,6 @@ class CarouselBuilder(Structure):
                             dest,
                         )
                         process.add_event_dependency(
-                            evt.name, "switch_time", [carousel_state]
                             evt.name, "switch_time", [carousel_state]
                         )
 
@@ -562,7 +550,6 @@ class CarouselBuilder(Structure):
                     )
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
-                        evt.name, "switch_time", [carousel_state]
                     )
 
                     for col in cols:
@@ -572,7 +559,6 @@ class CarouselBuilder(Structure):
                             i_zone,
                         )
                         process.add_event_dependency(
-                            evt.name, "switch_time", [carousel_state]
                             evt.name, "switch_time", [carousel_state]
                         )
 
@@ -584,7 +570,6 @@ class CarouselBuilder(Structure):
                         zone.flow_direction,
                     )
                     process.add_event_dependency(
-                        evt.name, "switch_time", [carousel_state]
                         evt.name, "switch_time", [carousel_state]
                     )
 
@@ -1677,7 +1662,7 @@ class CarouselSolutionBulk(SolutionBase):
     def radial_coordinates(self) -> npt.ArrayLike:
         radial_coordinates = \
             self.simulation_results.solution.column_0.bulk.radial_coordinates
-        )
+
         if radial_coordinates is not None and len(radial_coordinates) == 1:
             radial_coordinates = None
 
