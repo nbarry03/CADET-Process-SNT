@@ -1,35 +1,42 @@
+from typing import Optional, Sequence
+
 import numpy as np
+
+from CADETProcess.processModel import MassActionLaw
 
 from . import ptc
 
 
 def calculate_buffer_equilibrium(
-        buffer,
-        reaction_system,
-        constant_indices=None,
-        reinit=True,
-        verbose=False):
-    """Calculate buffer equilibrium for given concentration.
+    buffer: Sequence[float],
+    reaction_system: MassActionLaw,
+    constant_indices: Optional[Sequence[int]] = None,
+    reinit: bool = True,
+    verbose: bool = False,
+) -> list[float]:
+    """
+    Calculate buffer equilibrium for given concentration.
 
     Parameters
     ----------
     buffer : list of floats
-        buffer concentration in mM
+        Buffer concentration in mM
     reaction_system : MassActionLaw
-        reaction rates and stoichiometric matrix for calculating equilibrium.
+        Reaction rates and stoichiometric matrix for calculating equilibrium.
     constant_indices : list, optional
         Indices of fixed target concentration (e.g. proton concentration/pH).
     reinit: Bool, optional
-        if True, run CADET with initial values to get 'smooth' initial values
+        If True, run CADET with initial values to get 'smooth' initial values
     verbose : Bool, optional
-        if True, print information at every ptc iteration.
+        If True, print information at every ptc iteration.
 
     Returns
     -------
     sol : list of floats.
-        buffer equilbrium concentrations
+        Buffer equilbrium concentrations
     """
-    def residual(c):
+
+    def residual(c: np.ndarray) -> np.ndarray:
         return dydx_mal(
             c,
             reaction_system,
@@ -37,7 +44,7 @@ def calculate_buffer_equilibrium(
             buffer.copy(),
         )
 
-    def jacobian(c):
+    def jacobian(c: np.ndarray) -> np.ndarray:
         return jac_mal(
             c,
             reaction_system,
@@ -51,15 +58,39 @@ def calculate_buffer_equilibrium(
         jacobian,
         1e-4,   # init step size
         1e-14,  # tolerance (scaled l2)
-        quiet=not(verbose),
+        quiet=not (verbose),
         maxIter=10000,
     )
 
     return np.round(np.abs(sol), 14).tolist()
 
 
-def dydx_mal(c, reaction_system, constant_indices=None, c_init=None):
-    cc = np.asarray(c, dtype='float64')
+def dydx_mal(
+    c: np.ndarray,
+    reaction_system: MassActionLaw,
+    constant_indices: Optional[Sequence[int]] = None,
+    c_init: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """
+    Compute the time derivative of concentrations in a mass action law system.
+
+    Parameters
+    ----------
+    c : np.ndarray
+        Concentration vector of components.
+    reaction_system : MassActionLaw
+        Reaction rates and stoichiometric matrix for calculating equilibrium.
+    constant_indices : Optional[Sequence[int]]
+        Indices of components whose concentrations are to be held constant.
+    c_init : Optional[np.ndarray]
+        Initial concentration vector (used to fix constants if constant_indices is provided).
+
+    Returns
+    -------
+    dydx : np.ndarray
+        Time derivative of concentration vector.
+    """
+    cc = np.asarray(c, dtype="float64")
     if constant_indices is not None:
         if c_init is None:
             c_init = c
@@ -75,11 +106,11 @@ def dydx_mal(c, reaction_system, constant_indices=None, c_init=None):
 
     for r_i in range(reaction_system.n_reactions):
         fwd_indices = np.where(exp_fwd[:, r_i] > 0.0)
-        prod = np.prod(cc[fwd_indices]**exp_fwd[:, r_i][fwd_indices])
+        prod = np.prod(cc[fwd_indices] ** exp_fwd[:, r_i][fwd_indices])
         r_fwd = k_fwd[r_i] * prod
 
         bwd_indices = np.where(exp_bwd[:, r_i] > 0.0)
-        prod = np.prod(cc[bwd_indices]**exp_bwd[:, r_i][bwd_indices])
+        prod = np.prod(cc[bwd_indices] ** exp_bwd[:, r_i][bwd_indices])
         r_bwd = k_bwd[r_i] * prod
 
         r[r_i] = r_fwd - r_bwd
@@ -93,8 +124,34 @@ def dydx_mal(c, reaction_system, constant_indices=None, c_init=None):
     return dydx
 
 
-def jac_mal(c, reaction_system, constant_indices=None, c_init=None):
-    cc = np.asarray(c, dtype='float64')
+def jac_mal(
+    c: np.ndarray,
+    reaction_system: MassActionLaw,
+    constant_indices: Optional[Sequence[int]] = None,
+    c_init: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """
+    Compute the Jacobian of a mass action law reaction system at given concentrations.
+
+    Parameters
+    ----------
+    c : np.ndarray
+        Current concentrations of components.
+    reaction_system : MassActionLaw
+        Reaction system object containing stoichiometry, exponents, and rate constants.
+    constant_indices : Optional[Sequence[int]]
+        Indices of components to be treated as constant
+        (i.e., their derivatives are zeroed out).
+    c_init : Optional[np.ndarray]
+        Initial concentration vector to reset constants if `constant_indices` is provided.
+
+    Returns
+    -------
+    jac : np.ndarray
+        Jacobian matrix (n_comp x n_comp) of the rate equations.
+
+    """
+    cc = np.asarray(c, dtype="float64")
 
     if constant_indices is not None:
         if c_init is None:

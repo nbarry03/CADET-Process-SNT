@@ -5,7 +5,7 @@ jupytext:
     extension: .md
     format_name: myst
     format_version: 0.13
-    jupytext_version: 1.14.5
+    jupytext_version: 1.17.1
 kernelspec:
   display_name: Python 3 (ipykernel)
   language: python
@@ -22,7 +22,7 @@ root_dir = Path('../../../../').resolve()
 sys.path.append(root_dir.as_posix())
 ```
 
-## The Yamamoto method
+# The Yamamoto method
 
 This example demonstrates how to estimate SMA binding parameters based on multiple gradient elution chromatograms
 using the Yamamoto method.
@@ -30,7 +30,7 @@ using the Yamamoto method.
 ```{code-cell}
 import numpy as np
 
-from CADETProcess.processModel import ComponentSystem, StericMassAction, LumpedRateModelWithPores
+from CADETProcess.processModel import ComponentSystem
 from CADETProcess.tools.yamamoto import GradientExperiment, fit_parameters
 
 from binding_model_parameters import create_column_model, create_in_silico_experimental_data

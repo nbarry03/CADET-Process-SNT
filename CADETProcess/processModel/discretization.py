@@ -11,8 +11,8 @@ The :class:`~CADETProcess.processModel.DiscretizationParametersBase` class is th
 class for all other classes in this module and defines some common parameters.
 Specific parameters for each scheme are defined as attributes of each class.
 
-"""
-from CADETProcess.dataStructure import Structure, frozen_attributes
+"""  # noqa
+
 from CADETProcess.dataStructure import (
     Bool,
     Constant,
@@ -28,19 +28,25 @@ from CADETProcess.dataStructure import (
 
 
 __all__ = [
-    'NoDiscretization',
-    'LRMDiscretizationFV', 'LRMDiscretizationDG',
-    'LRMPDiscretizationFV', 'LRMPDiscretizationDG',
-    'GRMDiscretizationFV', 'GRMDiscretizationDG',
-    'WenoParameters', 'ConsistencySolverParameters',
-    'DGMixin',
-    'MCTDiscretizationFV',
+    "DiscretizationParametersBase",
+    "NoDiscretization",
+    "LRMDiscretizationFV",
+    "LRMDiscretizationDG",
+    "LRMPDiscretizationFV",
+    "LRMPDiscretizationDG",
+    "GRMDiscretizationFV",
+    "GRMDiscretizationDG",
+    "WenoParameters",
+    "ConsistencySolverParameters",
+    "DGMixin",
+    "MCTDiscretizationFV",
 ]
 
 
 @frozen_attributes
 class DiscretizationParametersBase(Structure):
-    """Base class for storing discretization parameters.
+    """
+    Base class for storing discretization parameters.
 
     Attributes
     ----------
@@ -50,11 +56,11 @@ class DiscretizationParametersBase(Structure):
         Parameters for the WENO scheme.
     consistency_solver: ConsistencySolverParameters
         Consistency solver parameters for Cadet.
-
     """
+
     _dimensionality = []
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize a new DiscretizationParametersBase instance."""
         self.weno_parameters = WenoParameters()
         self.consistency_solver = ConsistencySolverParameters()
@@ -62,7 +68,7 @@ class DiscretizationParametersBase(Structure):
         super().__init__()
 
     @property
-    def dimensionality(self):
+    def dimensionality(self) -> dict:
         """dict: Dimensionality of the parameters."""
         dim = {}
         for d in self._dimensionality:
@@ -74,23 +80,22 @@ class DiscretizationParametersBase(Structure):
         return dim
 
     @property
-    def parameters(self):
+    def parameters(self) -> dict:
         """dict: Dictionary with parameter values."""
         parameters = super().parameters
-        parameters['weno'] = self.weno_parameters.parameters
-        parameters['consistency_solver'] = self.consistency_solver.parameters
+        parameters["weno"] = self.weno_parameters.parameters
+        parameters["consistency_solver"] = self.consistency_solver.parameters
 
         return parameters
 
     @parameters.setter
-    def parameters(self, parameters):
+    def parameters(self, parameters: dict) -> None:
         try:
-            self.weno_parameters.parameters = parameters.pop('weno')
+            self.weno_parameters.parameters = parameters.pop("weno")
         except KeyError:
             pass
         try:
-            self.consistency_solver.parameters \
-                = parameters.pop('consistency_solver')
+            self.consistency_solver.parameters = parameters.pop("consistency_solver")
         except KeyError:
             pass
 
@@ -106,11 +111,14 @@ class NoDiscretization(DiscretizationParametersBase):
 
 
 class DGMixin(DiscretizationParametersBase):
+    """Mixin DG discretization parameters."""
+
     pass
 
 
 class LRMDiscretizationFV(DiscretizationParametersBase):
-    """Discretization parameters of the FV version of the LRM.
+    """
+    Discretization parameters of the FV version of the LRM.
 
     Attributes
     ----------
@@ -123,22 +131,24 @@ class LRMDiscretizationFV(DiscretizationParametersBase):
     reconstruction : Switch, optional
         Method for spatial reconstruction. Valid values are 'WENO' (Weighted
         Essentially Non-Oscillatory). Default is 'WENO'.
-
     """
 
-    spatial_method = Constant(value='FV')
+    spatial_method = Constant(value="FV")
     ncol = UnsignedInteger(default=100)
     use_analytic_jacobian = Bool(default=True)
-    reconstruction = Switch(default='WENO', valid=['WENO'])
+    reconstruction = Switch(default="WENO", valid=["WENO"])
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'ncol', 'use_analytic_jacobian', 'reconstruction',
+        "ncol",
+        "use_analytic_jacobian",
+        "reconstruction",
     ]
-    _dimensionality = ['ncol']
+    _dimensionality = ["ncol"]
 
 
 class LRMDiscretizationDG(DGMixin):
-    """Discretization parameters of the DG version of the LRM.
+    """
+    Discretization parameters of the DG version of the LRM.
 
     Attributes
     ----------
@@ -158,29 +168,31 @@ class LRMDiscretizationDG(DGMixin):
     --------
     CADETProcess.processModel.LRMPDiscretizationFV
     CADETProcess.processModel.LumpedRateModelWithPores
-
     """
 
-    spatial_method = Constant(value='DG')
+    spatial_method = Constant(value="DG")
     nelem = UnsignedInteger(default=16)
     use_analytic_jacobian = Bool(default=True)
     polydeg = UnsignedInteger(default=4)
     exact_integration = Bool(default=False)
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'nelem', 'use_analytic_jacobian',
-        'polydeg', 'exact_integration'
+        "nelem",
+        "use_analytic_jacobian",
+        "polydeg",
+        "exact_integration",
     ]
-    _dimensionality = ['axial_dof']
+    _dimensionality = ["axial_dof"]
 
     @property
-    def axial_dof(self):
+    def axial_dof(self) -> int:
         """int: Number of degrees of freedom in the axial discretization."""
         return self.nelem * (self.polydeg + 1)
 
 
 class LRMPDiscretizationFV(DiscretizationParametersBase):
-    """Discretization parameters of the FV version of the LRMP.
+    """
+    Discretization parameters of the FV version of the LRMP.
 
     Attributes
     ----------
@@ -215,19 +227,15 @@ class LRMPDiscretizationFV(DiscretizationParametersBase):
     --------
     CADETProcess.processModel.LRMPDiscretizationDG
     CADETProcess.processModel.LumpedRateModelWithPores
-
     """
 
-    spatial_method = Constant(value='FV')
+    spatial_method = Constant(value="FV")
     ncol = UnsignedInteger(default=100)
 
-    par_geom = Switch(
-        default='SPHERE',
-        valid=['SPHERE', 'CYLINDER', 'SLAB']
-    )
+    par_geom = Switch(default="SPHERE", valid=["SPHERE", "CYLINDER", "SLAB"])
 
     use_analytic_jacobian = Bool(default=True)
-    reconstruction = Switch(default='WENO', valid=['WENO'])
+    reconstruction = Switch(default="WENO", valid=["WENO"])
 
     gs_type = Bool(default=True)
     max_krylov = UnsignedInteger(default=0)
@@ -235,15 +243,21 @@ class LRMPDiscretizationFV(DiscretizationParametersBase):
     schur_safety = UnsignedFloat(default=1.0e-8)
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'ncol', 'par_geom',
-        'use_analytic_jacobian', 'reconstruction',
-        'gs_type', 'max_krylov', 'max_restarts', 'schur_safety'
+        "ncol",
+        "par_geom",
+        "use_analytic_jacobian",
+        "reconstruction",
+        "gs_type",
+        "max_krylov",
+        "max_restarts",
+        "schur_safety",
     ]
-    _dimensionality = ['ncol']
+    _dimensionality = ["ncol"]
 
 
 class LRMPDiscretizationDG(DGMixin):
-    """Discretization parameters of the DG version of the LRMP.
+    """
+    Discretization parameters of the DG version of the LRMP.
 
     Attributes
     ----------
@@ -267,36 +281,35 @@ class LRMPDiscretizationDG(DGMixin):
     --------
     CADETProcess.processModel.LRMPDiscretizationFV
     CADETProcess.processModel.LumpedRateModelWithPores
-
     """
 
-    spatial_method = Constant(value='DG')
+    spatial_method = Constant(value="DG")
     nelem = UnsignedInteger(default=16)
 
-    par_geom = Switch(
-        default='SPHERE',
-        valid=['SPHERE', 'CYLINDER', 'SLAB']
-    )
+    par_geom = Switch(default="SPHERE", valid=["SPHERE", "CYLINDER", "SLAB"])
 
     use_analytic_jacobian = Bool(default=True)
     polydeg = UnsignedInteger(default=4)
     exact_integration = Bool(default=False)
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'nelem', 'par_geom',
-        'use_analytic_jacobian',
-        'polydeg', 'exact_integration',
+        "nelem",
+        "par_geom",
+        "use_analytic_jacobian",
+        "polydeg",
+        "exact_integration",
     ]
-    _dimensionality = ['axial_dof']
+    _dimensionality = ["axial_dof"]
 
     @property
-    def axial_dof(self):
+    def axial_dof(self) -> int:
         """int: Number of axial degrees of freedom in the spatial discretization."""
         return self.nelem * (self.polydeg + 1)
 
 
 class GRMDiscretizationFV(DiscretizationParametersBase):
-    """Discretization parameters of the FV version of the LRMP.
+    """
+    Discretization parameters of the FV version of the LRMP.
 
     Attributes
     ----------
@@ -353,29 +366,25 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     --------
     CADETProcess.processModel.LRMPDiscretizationDG
     CADETProcess.processModel.LumpedRateModelWithPores
-
     """
 
-    spatial_method = Constant(value='FV')
+    spatial_method = Constant(value="FV")
     ncol = UnsignedInteger(default=100)
     npar = TypedList(dtype=int)
 
-    par_geom = Switch(
-        default='SPHERE',
-        valid=['SPHERE', 'CYLINDER', 'SLAB']
-    )
+    par_geom = Switch(default="SPHERE", valid=["SPHERE", "CYLINDER", "SLAB"])
     par_disc_type = Switch(
-        default='EQUIDISTANT_PAR',
-        valid=['EQUIDISTANT_PAR', 'EQUIVOLUME_PAR', 'USER_DEFINED_PAR']
+        default="EQUIDISTANT_PAR",
+        valid=["EQUIDISTANT_PAR", "EQUIVOLUME_PAR", "USER_DEFINED_PAR"],
     )
     par_disc_vector = SizedRangedList(
-        lb=0, ub=1, size='par_disc_vector_length', is_optional=True
+        lb=0, ub=1, size="par_disc_vector_length", is_optional=True
     )
 
     par_boundary_order = RangedInteger(lb=1, ub=2, default=2)
 
     use_analytic_jacobian = Bool(default=True)
-    reconstruction = Switch(default='WENO', valid=['WENO'])
+    reconstruction = Switch(default="WENO", valid=["WENO"])
 
     gs_type = Bool(default=True)
     max_krylov = UnsignedInteger(default=0)
@@ -385,29 +394,45 @@ class GRMDiscretizationFV(DiscretizationParametersBase):
     fix_zero_surface_diffusion = Bool(default=False)
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'ncol', 'npar',
-        'par_geom', 'par_disc_type', 'par_disc_vector', 'par_boundary_order',
-        'use_analytic_jacobian', 'reconstruction',
-        'gs_type', 'max_krylov', 'max_restarts', 'schur_safety',
-        'fix_zero_surface_diffusion',
+        "ncol",
+        "npar",
+        "par_geom",
+        "par_disc_type",
+        "par_disc_vector",
+        "par_boundary_order",
+        "use_analytic_jacobian",
+        "reconstruction",
+        "gs_type",
+        "max_krylov",
+        "max_restarts",
+        "schur_safety",
+        "fix_zero_surface_diffusion",
     ]
     _required_parameters = [
-        'ncol', 'npar',
-        'par_geom', 'par_disc_type', 'par_boundary_order',
-        'use_analytic_jacobian', 'reconstruction',
-        'gs_type', 'max_krylov', 'max_restarts', 'schur_safety',
-        'fix_zero_surface_diffusion',
+        "ncol",
+        "npar",
+        "par_geom",
+        "par_disc_type",
+        "par_boundary_order",
+        "use_analytic_jacobian",
+        "reconstruction",
+        "gs_type",
+        "max_krylov",
+        "max_restarts",
+        "schur_safety",
+        "fix_zero_surface_diffusion",
     ]
-    _dimensionality = ['ncol', 'npar']
+    _dimensionality = ["ncol", "npar"]
 
     @property
-    def par_disc_vector_length(self):
+    def par_disc_vector_length(self) -> int:
         """int: Number of entries in the particle discretization vector."""
         return sum([n + 1 for n in self.npar])
     
 
 class GRMDiscretizationDG(DGMixin):
-    """Discretization parameters of the DG version of the GRM.
+    """
+    Discretization parameters of the DG version of the GRM.
 
     Attributes
     ----------
@@ -445,23 +470,18 @@ class GRMDiscretizationDG(DGMixin):
     --------
     CADETProcess.processModel.GRMDiscretizationDG
     CADETProcess.processModel.GeneralRateModel
-
     """
-    spatial_method = Constant(value='DG')
+
+    spatial_method = Constant(value="DG")
     nelem = UnsignedInteger(default=16)
     par_nelem = UnsignedInteger(default=1)
 
-    par_geom = Switch(
-        default='SPHERE',
-        valid=['SPHERE', 'CYLINDER', 'SLAB']
-    )
+    par_geom = Switch(default="SPHERE", valid=["SPHERE", "CYLINDER", "SLAB"])
     par_disc_type = Switch(
-        default='EQUIDISTANT_PAR',
-        valid=['EQUIDISTANT_PAR', 'EQUIVOLUME_PAR', 'USER_DEFINED_PAR']
+        default="EQUIDISTANT_PAR",
+        valid=["EQUIDISTANT_PAR", "EQUIVOLUME_PAR", "USER_DEFINED_PAR"],
     )
-    par_disc_vector = SizedRangedList(
-        lb=0, ub=1, size='par_disc_vector_length'
-    )
+    par_disc_vector = SizedRangedList(lb=0, ub=1, size="par_disc_vector_length")
 
     par_boundary_order = RangedInteger(lb=1, ub=2, default=2)
 
@@ -474,34 +494,41 @@ class GRMDiscretizationDG(DGMixin):
     fix_zero_surface_diffusion = Bool(default=False)
 
     _parameters = DiscretizationParametersBase._parameters + [
-        'spatial_method', 'nelem', 'par_nelem',
-        'par_geom', 'par_disc_type', 'par_disc_vector', 'par_boundary_order',
-        'use_analytic_jacobian',
-        'polydeg', 'par_polydeg',
-        'exact_integration', 'par_exact_integration',
-        'fix_zero_surface_diffusion',
+        "nelem",
+        "par_nelem",
+        "par_geom",
+        "par_disc_type",
+        "par_disc_vector",
+        "par_boundary_order",
+        "use_analytic_jacobian",
+        "polydeg",
+        "par_polydeg",
+        "exact_integration",
+        "par_exact_integration",
+        "fix_zero_surface_diffusion",
     ]
-    _dimensionality = ['axial_dof', 'par_dof']
+    _dimensionality = ["axial_dof", "par_dof"]
 
     @property
-    def axial_dof(self):
+    def axial_dof(self) -> int:
         """int: Number of axial degrees of freedom in the axial discretization."""
         return self.nelem * (self.polydeg + 1)
 
     @property
-    def par_dof(self):
+    def par_dof(self) -> int:
         """int: Number of particle degrees of freedom in the axial discretization."""
         return self.axial_dof * self.par_disc_vector_length
 
     @property
-    def par_disc_vector_length(self):
+    def par_disc_vector_length(self) -> int:
         """int: Number of entries in the particle discretization vector."""
         return self.par_nelem * (self.par_polydeg + 1)
 
 
 @frozen_attributes
 class WenoParameters(Structure):
-    """Discretization parameters for the WENO scheme.
+    """
+    Discretization parameters for the WENO scheme.
 
     Attributes
     ----------
@@ -526,18 +553,18 @@ class WenoParameters(Structure):
     See Also
     --------
     Structure
-
     """
 
     boundary_model = UnsignedInteger(default=0, ub=3)
     weno_eps = UnsignedFloat(default=1e-10)
     weno_order = UnsignedInteger(default=3, ub=3)
-    _parameters = ['boundary_model', 'weno_eps', 'weno_order']
+    _parameters = ["boundary_model", "weno_eps", "weno_order"]
 
 
 @frozen_attributes
 class ConsistencySolverParameters(Structure):
-    """A class for defining the consistency solver parameters for Cadet.
+    """
+    A class for defining the consistency solver parameters for Cadet.
 
     Parameters
     ----------
@@ -560,29 +587,28 @@ class ConsistencySolverParameters(Structure):
     See Also
     --------
     Structure
-
     """
 
     solver_name = Switch(
-        default='LEVMAR',
-        valid=['LEVMAR', 'ATRN_RES', 'ARTN_ERR', 'COMPOSITE']
+        default="LEVMAR", valid=["LEVMAR", "ATRN_RES", "ARTN_ERR", "COMPOSITE"]
     )
     init_damping = UnsignedFloat(default=0.01)
     min_damping = UnsignedFloat(default=0.0001)
     max_iterations = UnsignedInteger(default=50)
-    subsolvers = Switch(
-        default='LEVMAR',
-        valid=['LEVMAR', 'ATRN_RES', 'ARTN_ERR']
-    )
+    subsolvers = Switch(default="LEVMAR", valid=["LEVMAR", "ATRN_RES", "ARTN_ERR"])
 
     _parameters = [
-        'solver_name', 'init_damping', 'min_damping',
-        'max_iterations', 'subsolvers'
+        "solver_name",
+        "init_damping",
+        "min_damping",
+        "max_iterations",
+        "subsolvers",
     ]
 
 
 class MCTDiscretizationFV(DiscretizationParametersBase):
-    """Discretization parameters of the FV version of the MCT.
+    """
+    Discretization parameters of the FV version of the MCT.
 
     Attributes
     ----------
@@ -595,14 +621,12 @@ class MCTDiscretizationFV(DiscretizationParametersBase):
     reconstruction : Switch, optional
         Method for spatial reconstruction. Valid values are 'WENO' (Weighted
         Essentially Non-Oscillatory). Default is 'WENO'.
-
     """
 
+    spatial_method = Constant(value="FV")
     ncol = UnsignedInteger(default=100)
     use_analytic_jacobian = Bool(default=True)
-    reconstruction = Switch(default='WENO', valid=['WENO'])
+    reconstruction = Switch(default="WENO", valid=["WENO"])
 
-    _parameters = [
-        'ncol', 'use_analytic_jacobian', 'reconstruction',
-    ]
-    _dimensionality = ['ncol']
+    _parameters = ["ncol", "use_analytic_jacobian", "reconstruction"]
+    _dimensionality = ["ncol"]

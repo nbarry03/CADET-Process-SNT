@@ -8,9 +8,10 @@ for other solvers.
 
 See https://cadet-process.readthedocs.io for complete documentation.
 """
+
 # Version information
 name = "CADET-Process"
-__version__ = "0.10.1"
+__version__ = "0.11.1"
 
 # Imports
 from .CADETProcessError import *
@@ -22,6 +23,7 @@ from .settings import Settings
 settings = Settings()
 
 from . import sysinfo
+from . import numerics
 from . import dataStructure
 from . import transform
 from . import plotting

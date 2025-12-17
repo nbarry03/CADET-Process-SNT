@@ -1,10 +1,11 @@
+from typing import Any
+
 from CADETProcess import CADETProcessError
-from CADETProcess.dataStructure import Structure
-from CADETProcess.dataStructure import frozen_attributes
 
 
-class ParameterWrapper():
-    """Base class for converting the config from objects such as units.
+class ParameterWrapper:
+    """
+    Base class for converting the config from objects such as units.
 
     Attributes
     ----------
@@ -17,12 +18,12 @@ class ParameterWrapper():
     ------
     CADETProcessError
         If the wrapped_object is no instance of the base_class.
-
     """
 
     _base_class = object
 
-    def __init__(self, wrapped_object):
+    def __init__(self, wrapped_object: Any) -> None:
+        """Construct ParameterWrapper object."""
         if not isinstance(wrapped_object, self._baseClass):
             raise CADETProcessError(f"Expected {self._baseClass}")
 
@@ -35,17 +36,18 @@ class ParameterWrapper():
         self._wrapped_object = wrapped_object
 
     @property
-    def parameters(self):
+    def parameters(self) -> dict:
+        """dict: Parameters dictionary."""
         model_parameters = {}
 
-        model_parameters[self._model_type] = self.model_parameters['name']
+        model_parameters[self._model_type] = self.model_parameters["name"]
 
-        for key, value in self.model_parameters['parameters'].items():
+        for key, value in self.model_parameters["parameters"].items():
             value = getattr(self._wrapped_object, value)
             if value is not None:
                 model_parameters[key] = value
 
-        for key, value in self.model_parameters.get('fixed', dict()).items():
+        for key, value in self.model_parameters.get("fixed", dict()).items():
             if isinstance(value, list):
                 value = self._wrapped_object.n_comp * value
             model_parameters[key] = value

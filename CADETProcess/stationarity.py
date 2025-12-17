@@ -14,25 +14,25 @@ Module to evaluate cyclic stationarity of succeeding cycles.
     NRMSE
     StationarityEvaluator
 
-"""
+"""  # noqa
 
-from addict import Dict
+from typing import Any, Optional
+
 import numpy as np
+from addict import Dict
 
-from CADETProcess import log
-from CADETProcess.dataStructure import Structure, UnsignedFloat
-from CADETProcess import SimulationResults
+from CADETProcess import SimulationResults, log
 from CADETProcess.comparison import Comparator
+from CADETProcess.dataStructure import Structure, UnsignedFloat
 from CADETProcess.processModel import Inlet
 
-
-__all__ = ['RelativeArea', 'NRMSE', 'StationarityEvaluator']
+__all__ = ["RelativeArea", "NRMSE", "StationarityEvaluator"]
 
 
 class CriterionBase(Structure):
     threshold = UnsignedFloat(default=1e-3)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__class__.__name__
 
 
@@ -51,14 +51,17 @@ class NRMSE(CriterionBase):
 class StationarityEvaluator(Comparator):
     """Class for checking two succeding chromatograms for stationarity."""
 
-    valid_criteria = ['RelativeArea', 'NRMSE']
+    valid_criteria = ["RelativeArea", "NRMSE"]
 
     def __init__(
-            self,
-            criteria=None,
-            log_level='WARNING',
-            *args, **kwargs):
-        """Initialize the stationarity evaluator.
+        self,
+        criteria: Optional[list[CriterionBase]] = None,
+        log_level: str = "WARNING",
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize the stationarity evaluator.
 
         Parameters
         ----------
@@ -71,33 +74,35 @@ class StationarityEvaluator(Comparator):
         kwargs : dict
             Additional keyword arguments.
         """
+        # TODO: Check why cirteria are not stored.
         super().__init__(*args, **kwargs)
 
-        self.logger = log.get_logger('StationarityEvaluator', level=log_level)
+        self.logger = log.get_logger("StationarityEvaluator", level=log_level)
 
         self._criteria = []
 
     @property
-    def criteria(self):
+    def criteria(self) -> list:
         """list: List of criteria."""
         return self._criteria
 
-    def add_criterion(self, criterion):
-        """Add a criterion to the list of criteria.
+    def add_criterion(self, criterion: CriterionBase) -> None:
+        """
+        Add a criterion to the list of criteria.
 
         Parameters
         ----------
         criterion : CriterionBase
             Criterion to add to the list of criteria.
-
         """
         if not isinstance(criterion, CriterionBase):
             raise TypeError("Expected CriterionBase.")
 
         self._criteria.append(criterion)
 
-    def assert_stationarity(self, simulation_results):
-        """Check stationarity of two succeeding cycles.
+    def assert_stationarity(self, simulation_results: SimulationResults) -> bool:
+        """
+        Check stationarity of two succeeding cycles.
 
         Parameters
         ----------
@@ -113,12 +118,11 @@ class StationarityEvaluator(Comparator):
         ------
         TypeError
             If simulation_results is not a SimulationResults object.
-
         """
         self._metrics = []
         criteria = Dict()
         if not isinstance(simulation_results, SimulationResults):
-            raise TypeError('Expcected SimulationResults')
+            raise TypeError("Expcected SimulationResults")
 
         stationarity = True
         for unit, solution in simulation_results.solution_cycles.items():
@@ -130,18 +134,18 @@ class StationarityEvaluator(Comparator):
 
             for c in self.criteria:
                 metric = self.add_difference_metric(
-                    str(c), unit, f'{unit}.outlet', smooth=False
+                    str(c), unit, f"{unit}.outlet", smooth=False
                 )
-                criteria[unit][str(c)]['threshold'] = c.threshold
+                criteria[unit][str(c)]["threshold"] = c.threshold
                 diff = metric.evaluate(solution_this)
-                criteria[unit][str(c)]['metric'] = diff
+                criteria[unit][str(c)]["metric"] = diff
                 if not np.all(diff <= c.threshold):
                     s = False
                     stationarity = s
                 else:
                     s = True
-                criteria[unit][str(c)]['stationarity'] = s
+                criteria[unit][str(c)]["stationarity"] = s
 
-        self.logger.debug(f'Stationrity criteria: {criteria}')
+        self.logger.debug(f"Stationrity criteria: {criteria}")
 
         return stationarity

@@ -6,17 +6,13 @@ import time
 import unittest
 
 from CADETProcess import settings
-from CADETProcess.optimization import U_NSGA3
+from CADETProcess.optimization import U_NSGA3, SequentialBackend
 from CADETProcess.simulator import Cadet
-from CADETProcess.optimization import SequentialBackend
 
 from tests.test_cadet_adapter import detect_cadet
 from tests.test_optimization_problem import setup_optimization_problem
 
-
-parallel_backends_module = importlib.import_module(
-    'CADETProcess.optimization'
-)
+parallel_backends_module = importlib.import_module("CADETProcess.optimization")
 
 _parallel_backends = [
     "Joblib",
@@ -42,9 +38,6 @@ cpu_count = multiprocessing.cpu_count()
 class TestParallelizationBackend(unittest.TestCase):
     """Test initializing parallelization backends and n_cores attribute."""
 
-    def __init__(self, methodName='runTest'):
-        super().__init__(methodName)
-
     def test_n_cores(self):
         with self.assertRaises(ValueError):
             sequential_backend = SequentialBackend(n_cores=n_cores)
@@ -60,7 +53,7 @@ class TestParallelizationBackend(unittest.TestCase):
     def test_max_cores(self):
         for Backend in parallel_backends:
             with self.assertRaises(ValueError):
-                backend = Backend(n_cores=cpu_count+1)
+                backend = Backend(n_cores=cpu_count + 1)
 
     def test_negative_n_cores(self):
         for Backend in parallel_backends:
@@ -72,12 +65,12 @@ class TestParallelizationBackend(unittest.TestCase):
 
             backend.n_cores = -2
             if cpu_count > 1:
-                self.assertEqual(backend._n_cores, cpu_count-1)
+                self.assertEqual(backend._n_cores, cpu_count - 1)
             else:
                 self.assertEqual(backend._n_cores, 1)
 
             with self.assertRaises(ValueError):
-                backend.n_cores = - cpu_count - 1
+                backend.n_cores = -cpu_count - 1
 
 
 class TestParallelEvaluation(unittest.TestCase):
@@ -89,12 +82,9 @@ class TestParallelEvaluation(unittest.TestCase):
 
     """
 
-    def __init__(self, methodName='runTest'):
-        super().__init__(methodName)
-
     def tearDown(self):
-        shutil.rmtree('./tmp', ignore_errors=True)
-        shutil.rmtree('./test_parallelization', ignore_errors=True)
+        shutil.rmtree("./tmp", ignore_errors=True)
+        shutil.rmtree("./test_parallelization", ignore_errors=True)
 
     def test_parallelization_backend(self):
         def evaluation_function(sleep_time=0.0):
@@ -117,7 +107,10 @@ class TestParallelEvaluation(unittest.TestCase):
             file_name = simulator.get_tempfile_name()
             cwd = simulator.temp_dir
             sim = simulator.create_lwe(cwd / file_name)
-            sim.run()
+            if hasattr(sim, "run_simulation"):
+                return_information = sim.run_simulation()
+            else:
+                return_information = sim.run_load()
 
             return True
 
@@ -140,14 +133,11 @@ class TestOptimizerParallelizationBackend(unittest.TestCase):
 
     """
 
-    def __init__(self, methodName='runTest'):
-        super().__init__(methodName)
-
     def tearDown(self):
         settings.working_directory = None
 
-        shutil.rmtree('./test_parallelization', ignore_errors=True)
-        shutil.rmtree('./diskcache_simple', ignore_errors=True)
+        shutil.rmtree("./test_parallelization", ignore_errors=True)
+        shutil.rmtree("./diskcache_simple", ignore_errors=True)
 
     def test_parallel_optimization(self):
         def run_optimization(backend=None):
@@ -156,7 +146,7 @@ class TestOptimizerParallelizationBackend(unittest.TestCase):
                 time.sleep(0.05)
                 return y
 
-            settings.working_directory = './test_parallelization'
+            settings.working_directory = "./test_parallelization"
 
             optimization_problem = setup_optimization_problem(
                 use_diskcache=True, obj_fun=dummy_objective_function
@@ -195,5 +185,5 @@ class TestOptimizerParallelizationBackend(unittest.TestCase):
             run_optimization(backend=backend)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

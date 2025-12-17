@@ -1,22 +1,20 @@
 import unittest
+
 import numpy as np
-
-from CADETProcess.processModel import ComponentSystem
-from CADETProcess.processModel import Linear
-from CADETProcess.processModel import Inlet, Outlet, LumpedRateModelWithoutPores
-
 from CADETProcess.modelBuilder import (
-    CarouselBuilder, SerialCarouselBuilder, SerialZone, ParallelZone
-    )
+    CarouselBuilder, SerialCarouselBuilder, ParallelZone, SerialZone
+from CADETProcess.processModel import (
+    ComponentSystem,
+    Inlet,
+    Linear,
+    LumpedRateModelWithoutPores,
+    Outlet,
+)    )
 
 from CADETProcess.simulator import Cadet
 
 
 class Test_Carousel(unittest.TestCase):
-
-    def __init__(self, methodName='runTest'):
-        super().__init__(methodName)
-
     def setUp(self):
         self.component_system = ComponentSystem(2)
 
@@ -37,17 +35,15 @@ class Test_Carousel(unittest.TestCase):
             subunit.binding_model = self.binding_model
 
     def create_serial(self):
-        source = Inlet(self.component_system, name='source')
+        source = Inlet(self.component_system, name="source")
         source.c = [10, 10]
         source.flow_rate = 2e-7
 
-        sink = Outlet(self.component_system, name='sink')
+        sink = Outlet(self.component_system, name="sink")
 
-        serial_zone = SerialZone(
-            self.component_system, 'serial', 2, flow_direction=1
-        )
+        serial_zone = SerialZone(self.component_system, "serial", 2, flow_direction=1)
 
-        builder = CarouselBuilder(self.component_system, 'serial')
+        builder = CarouselBuilder(self.component_system, "serial")
         builder.column = self.column
 
         builder.add_unit(source)
@@ -62,17 +58,17 @@ class Test_Carousel(unittest.TestCase):
         return builder
 
     def create_parallel(self):
-        source = Inlet(self.component_system, name='source')
+        source = Inlet(self.component_system, name="source")
         source.c = [10, 10]
         source.flow_rate = 2e-7
 
-        sink = Outlet(self.component_system, name='sink')
+        sink = Outlet(self.component_system, name="sink")
 
         parallel_zone = ParallelZone(
-            self.component_system, 'parallel', 2, flow_direction=1
+            self.component_system, "parallel", 2, flow_direction=1
         )
 
-        builder = CarouselBuilder(self.component_system, 'parallel')
+        builder = CarouselBuilder(self.component_system, "parallel")
         builder.column = self.column
 
         builder.add_unit(source)
@@ -87,23 +83,23 @@ class Test_Carousel(unittest.TestCase):
         return builder
 
     def create_smb(self):
-        feed = Inlet(self.component_system, name='feed')
+        feed = Inlet(self.component_system, name="feed")
         feed.c = [10, 10]
         feed.flow_rate = 2e-7
 
-        eluent = Inlet(self.component_system, name='eluent')
+        eluent = Inlet(self.component_system, name="eluent")
         eluent.c = [0, 0]
         eluent.flow_rate = 6e-7
 
-        raffinate = Outlet(self.component_system, name='raffinate')
-        extract = Outlet(self.component_system, name='extract')
+        raffinate = Outlet(self.component_system, name="raffinate")
+        extract = Outlet(self.component_system, name="extract")
 
-        zone_I = SerialZone(self.component_system, 'zone_I', 1)
-        zone_II = SerialZone(self.component_system, 'zone_II', 1)
-        zone_III = SerialZone(self.component_system, 'zone_III', 1)
-        zone_IV = SerialZone(self.component_system, 'zone_IV', 1)
+        zone_I = SerialZone(self.component_system, "zone_I", 1)
+        zone_II = SerialZone(self.component_system, "zone_II", 1)
+        zone_III = SerialZone(self.component_system, "zone_III", 1)
+        zone_IV = SerialZone(self.component_system, "zone_IV", 1)
 
-        builder = CarouselBuilder(self.component_system, 'smb')
+        builder = CarouselBuilder(self.component_system, "smb")
         builder.column = self.column
         builder.add_unit(feed)
         builder.add_unit(eluent)
@@ -121,7 +117,7 @@ class Test_Carousel(unittest.TestCase):
         builder.add_connection(zone_I, extract)
         builder.add_connection(zone_I, zone_II)
         w_e = 0.15
-        builder.set_output_state(zone_I, [w_e, 1-w_e])
+        builder.set_output_state(zone_I, [w_e, 1 - w_e])
 
         builder.add_connection(zone_II, zone_III)
 
@@ -130,7 +126,7 @@ class Test_Carousel(unittest.TestCase):
         builder.add_connection(zone_III, raffinate)
         builder.add_connection(zone_III, zone_IV)
         w_r = 0.15
-        builder.set_output_state(zone_III, [w_r, 1-w_r])
+        builder.set_output_state(zone_III, [w_r, 1 - w_r])
 
         builder.add_connection(zone_IV, zone_I)
 
@@ -139,27 +135,25 @@ class Test_Carousel(unittest.TestCase):
         return builder
 
     def create_multi_zone(self):
-        source_serial = Inlet(self.component_system, name='source_serial')
+        source_serial = Inlet(self.component_system, name="source_serial")
         source_serial.c = [10, 10]
         source_serial.flow_rate = 2e-7
 
-        sink_serial = Outlet(self.component_system, name='sink_serial')
+        sink_serial = Outlet(self.component_system, name="sink_serial")
 
-        serial_zone = SerialZone(
-            self.component_system, 'serial', 2, flow_direction=1
-        )
+        serial_zone = SerialZone(self.component_system, "serial", 2, flow_direction=1)
 
-        source_parallel = Inlet(self.component_system, name='source_parallel')
+        source_parallel = Inlet(self.component_system, name="source_parallel")
         source_parallel.c = [10, 10]
         source_parallel.flow_rate = 2e-7
 
-        sink_parallel = Outlet(self.component_system, name='sink_parallel')
+        sink_parallel = Outlet(self.component_system, name="sink_parallel")
 
         parallel_zone = ParallelZone(
-            self.component_system, 'parallel', 2, flow_direction=-1
+            self.component_system, "parallel", 2, flow_direction=-1
         )
 
-        builder = CarouselBuilder(self.component_system, 'multi_zone')
+        builder = CarouselBuilder(self.component_system, "multi_zone")
         builder.column = self.column
         builder.add_unit(source_serial)
         builder.add_unit(source_parallel)
@@ -339,15 +333,11 @@ class Test_Carousel(unittest.TestCase):
         self.assertTrue(flow_sheet.connection_exists("zone_I_outlet", "extract"))
         self.assertTrue(flow_sheet.connection_exists("zone_I_outlet", "zone_II_inlet"))
 
-        self.assertTrue(
-            flow_sheet.connection_exists('zone_I_outlet', 'extract')
-        )
-        self.assertTrue(
-            flow_sheet.connection_exists('zone_I_outlet', 'zone_II_inlet')
-        )
+        self.assertTrue(flow_sheet.connection_exists("zone_I_outlet", "extract"))
+        self.assertTrue(flow_sheet.connection_exists("zone_I_outlet", "zone_II_inlet"))
 
         self.assertTrue(
-            flow_sheet.connection_exists('zone_II_outlet', 'zone_III_inlet')
+            flow_sheet.connection_exists("zone_II_outlet", "zone_III_inlet")
         )
 
         # Each zone inlet should connect to top of each column
@@ -387,9 +377,7 @@ class Test_Carousel(unittest.TestCase):
         carousel_state = 0
         indices_expected = 0
 
-        indices = builder.column_indices_at_state(
-            carousel_position, carousel_state
-        )
+        indices = builder.column_indices_at_state(carousel_position, carousel_state)
         self.assertEqual(indices_expected, indices)
 
         time = carousel_state * builder.switch_time
@@ -401,9 +389,7 @@ class Test_Carousel(unittest.TestCase):
         carousel_state = 0
         indices_expected = 1
 
-        indices = builder.column_indices_at_state(
-            carousel_position, carousel_state
-        )
+        indices = builder.column_indices_at_state(carousel_position, carousel_state)
         self.assertEqual(indices_expected, indices)
 
         time = carousel_state * builder.switch_time
@@ -415,9 +401,7 @@ class Test_Carousel(unittest.TestCase):
         carousel_state = 1
         indices_expected = 1
 
-        indices = builder.column_indices_at_state(
-            carousel_position, carousel_state
-        )
+        indices = builder.column_indices_at_state(carousel_position, carousel_state)
         self.assertEqual(indices_expected, indices)
 
         time = carousel_state * builder.switch_time
@@ -429,9 +413,7 @@ class Test_Carousel(unittest.TestCase):
         carousel_state = 1
         indices_expected = 2
 
-        indices = builder.column_indices_at_state(
-            carousel_position, carousel_state
-        )
+        indices = builder.column_indices_at_state(carousel_position, carousel_state)
         self.assertEqual(indices_expected, indices)
 
         time = carousel_state * builder.switch_time
@@ -443,9 +425,7 @@ class Test_Carousel(unittest.TestCase):
         carousel_state = 4
         indices_expected = 0
 
-        indices = builder.column_indices_at_state(
-            carousel_position, carousel_state
-        )
+        indices = builder.column_indices_at_state(carousel_position, carousel_state)
         self.assertEqual(indices_expected, indices)
 
         time = carousel_state * builder.switch_time
@@ -466,7 +446,7 @@ class Test_Carousel(unittest.TestCase):
         self.assertEqual(state_expected, state)
 
         # Position 0
-        time = builder.switch_time/2
+        time = builder.switch_time / 2
         state_expected = 0
 
         state = builder.carousel_state(time)
@@ -482,7 +462,7 @@ class Test_Carousel(unittest.TestCase):
         self.assertEqual(state_expected, state)
 
         # Back to initial state; position 0
-        time = 4*builder.switch_time
+        time = 4 * builder.switch_time
         state_expected = 0
 
         state = builder.carousel_state(time)
@@ -801,5 +781,146 @@ class Test_SerialCarousel(unittest.TestCase):
         self.assertEqual(simulation_results.exit_flag, 0)
 
 
-if __name__ == '__main__':
+class Test_SerialCarousel(unittest.TestCase):
+    """
+    Test suite to handle the specific implementations for the SerialCarouselBuilder.
+    """
+    def setUp(self):
+        self.component_system = ComponentSystem(2)
+
+        self.binding_model = Linear(self.component_system)
+        self.binding_model.adsorption_rate = [6, 8]
+        self.binding_model.desorption_rate = [1, 1]
+
+        self.column = [
+            LumpedRateModelWithoutPores(self.component_system, name='upstream'),
+            LumpedRateModelWithoutPores(self.component_system, name='downstream')
+            ]
+        for subunit in self.column:
+            subunit.length = 0.6
+            subunit.diameter = 0.024
+            subunit.axial_dispersion = 4.7e-7
+            subunit.total_porosity = 0.7
+
+            subunit.binding_model = self.binding_model
+
+        self.pipe = LumpedRateModelWithoutPores(self.component_system, name='pipe')
+        
+    def create_carousel(self, with_pipe:bool):
+        source = Inlet(self.component_system, name='feed')
+        sink = Outlet(self.component_system, name='raffinate')
+        serial_zone = SerialZone(self.component_system, 'serial_zone', 3)
+
+        builder = SerialCarouselBuilder(self.component_system, 'serial_carousel')
+        builder.column = self.column
+        if with_pipe:
+            builder.pipe = self.pipe
+        
+        builder.add_unit(source)
+        builder.add_unit(sink)
+        builder.add_unit(serial_zone)
+
+        builder.add_connection(source, serial_zone)
+        builder.add_connection(serial_zone, sink)
+
+        builder.switch_time = 300
+
+        return builder, serial_zone
+    
+    def test_units_and_pipes(self):
+        """Check if units are created, and pipes if passed."""
+        for mode in (False, True):
+            builder, _ = self.create_carousel(with_pipe=mode)
+            flow_sheet = builder.build_flow_sheet()
+
+            # Expect 3 columns * 2 subunits = 6 units total
+            n_cols = builder.n_columns
+            n_col_units_expected =  n_cols * len(builder.column)
+            n_pipes_expected = n_cols if mode else 0  # system with n cols has n pipes
+            self.assertEqual(
+                len([u for u in flow_sheet.units if 'pipe_' in u.name]),
+                n_pipes_expected
+            )
+            self.assertEqual(
+                len([u for u in flow_sheet.units if 'column_' in u.name]),
+                n_col_units_expected
+            )
+    
+    def test_ring_connections(self):
+        """Check if column bottom -> pipe -> column top."""
+        builder, _ = self.create_carousel(with_pipe=True)
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            pipe_name = f'pipe_{this_col.index}_{next_col.index}'
+            self.assertTrue(
+                flow_sheet.connection_exists(
+                    this_col.bottom.name, pipe_name
+                )
+            )
+            self.assertTrue(
+                pipe_name, next_col.top.name
+            )
+
+        builder, _ = self.create_carousel(with_pipe=False)
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            self.assertTrue(
+                flow_sheet.connection_exists(
+                    this_col.bottom.name, next_col.top.name
+                )
+            )
+    
+    def test_pipe_initial_state(self):
+        """Check that pipe initial states are set to the owning zone."""
+        builder, zone = self.create_carousel(with_pipe=True)
+        zone.initial_state = [
+            {'c': [1, 1]}, {'c': [2, 2]}, {'c': [3, 3]}
+        ]
+        flow_sheet = builder.build_flow_sheet()
+        for this_col, next_col in zip(
+            builder.columns, builder.columns[1:] + builder.columns[:1]
+        ):
+            pipe = flow_sheet[f'pipe_{this_col.index}_{next_col.index}']
+            expected = zone.initial_state[this_col.index]['c']
+            self.assertAlmostEqual(
+                pipe.initial_state['c'], expected
+            )
+    
+    def test_event_targets(self):
+        """Check that events route the correct ports."""
+        builder, _ = self.create_carousel(with_pipe=True)
+        process = builder.build_process()
+
+        event_names = {e.name:e for e in process.events}
+
+        # First column
+        evt = event_names['column_0_0']
+        self.assertEqual(
+            evt.parameter_path,
+            'flow_sheet.output_states.column_downstream_0'
+        )
+        self.assertEqual(evt.state, builder.n_zones) # should be routed to last port
+        
+        # Last column
+        evt = event_names['column_2_0']
+        self.assertEqual(
+            evt.parameter_path,
+            'flow_sheet.output_states.column_downstream_2'
+            )
+        self.assertEqual(evt.state, 0)  # should be routed to zone outlet (first port)
+
+    def test_simulate(self):
+        builder, _ = self.create_carousel(with_pipe=False)
+        process = builder.build_process()
+        process_simulator = Cadet()
+        simulation_results = process_simulator.simulate(process)
+
+        self.assertEqual(simulation_results.exit_flag, 0)
+
+
+if __name__ == "__main__":
     unittest.main()

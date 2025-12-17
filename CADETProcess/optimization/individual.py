@@ -1,15 +1,17 @@
 import hashlib
+from typing import Optional
 
-from addict import Dict
 import numpy as np
+import numpy.typing as npt
+from addict import Dict
 
 from CADETProcess import CADETProcessError
-from CADETProcess.dataStructure import Structure
-from CADETProcess.dataStructure import Bool, Float, Vector
+from CADETProcess.dataStructure import Bool, Float, Structure, Vector
 
 
 def hash_array(array: np.ndarray) -> str:
-    """Compute a hash value for an array of floats using the sha256 hash function.
+    """
+    Compute a hash value for an array of floats using the sha256 hash function.
 
     Parameters
     ----------
@@ -84,25 +86,26 @@ class Individual(Structure):
     is_feasible = Bool()
 
     def __init__(
-            self,
-            x,
-            f=None,
-            g=None,
-            f_min=None,
-            x_transformed=None,
-            cv_bounds=None,
-            cv_lincon=None,
-            cv_lineqcon=None,
-            cv_nonlincon=None,
-            m=None,
-            m_min=None,
-            independent_variable_names=None,
-            objective_labels=None,
-            nonlinear_constraint_labels=None,
-            meta_score_labels=None,
-            variable_names=None,
-            is_feasible=True,
-            ):
+        self,
+        x: npt.ArrayLike,
+        f: Optional[npt.ArrayLike] = None,
+        g: Optional[npt.ArrayLike] = None,
+        f_min: Optional[npt.ArrayLike] = None,
+        x_transformed: Optional[npt.ArrayLike] = None,
+        cv_bounds: Optional[npt.ArrayLike] = None,
+        cv_lincon: Optional[npt.ArrayLike] = None,
+        cv_lineqcon: Optional[npt.ArrayLike] = None,
+        cv_nonlincon: Optional[npt.ArrayLike] = None,
+        m: Optional[npt.ArrayLike] = None,
+        m_min: Optional[npt.ArrayLike] = None,
+        independent_variable_names: list[str] = None,
+        objective_labels: list[str] = None,
+        nonlinear_constraint_labels: list[str] = None,
+        meta_score_labels: list[str] = None,
+        variable_names: list[str] = None,
+        is_feasible: bool = True,
+    ) -> None:
+        """Initialize Individual Object."""
         self.x = x
         if x_transformed is None:
             x_transformed = x
@@ -132,7 +135,9 @@ class Individual(Structure):
             variable_names = [s.decode() for s in variable_names]
         self.variable_names = variable_names
         if isinstance(independent_variable_names, np.ndarray):
-            independent_variable_names = [s.decode() for s in independent_variable_names]
+            independent_variable_names = [
+                s.decode() for s in independent_variable_names
+            ]
         self.independent_variable_names = independent_variable_names
         if isinstance(objective_labels, np.ndarray):
             objective_labels = [s.decode() for s in objective_labels]
@@ -201,7 +206,6 @@ class Individual(Structure):
         -------
         np.ndarray
             All constraint violations combined.
-
         """
         cvs = (self.cv_bounds, self.cv_lincon, self.cv_lineqcon, self.cv_nonlincon)
         return np.concatenate([cv for cv in cvs if cv is not None])
@@ -222,7 +226,8 @@ class Individual(Structure):
         return self.m_min / self.m
 
     def dominates(self, other: "Individual") -> bool:
-        """Determine if individual dominates other.
+        """
+        Determine if individual dominates other.
 
         Parameters
         ----------
@@ -253,8 +258,8 @@ class Individual(Structure):
                 return better_in_all and strictly_better_in_one
 
         if self.m is not None:
-            self_values = self.m
-            other_values = other.m
+            self_values = self.m_min
+            other_values = other.m_min
         else:
             self_values = self.f_min
             other_values = other.f_min
@@ -268,7 +273,8 @@ class Individual(Structure):
         return False
 
     def is_similar(self, other: "Individual", tol: float = 1e-1) -> bool:
-        """Determine if individual is similar to other.
+        """
+        Determine if individual is similar to other.
 
         Parameters
         ----------
@@ -283,8 +289,9 @@ class Individual(Structure):
         is_similar : bool
             True if individuals are close to each other. False otherwise
         """
-        if tol is None:
+        if not tol:
             return False
+
         similar_x = self.is_similar_x(other, tol)
         similar_f = self.is_similar_f(other, tol)
 
@@ -301,12 +308,13 @@ class Individual(Structure):
         return similar_x and similar_f and similar_g and similar_m
 
     def is_similar_x(
-            self,
-            other: "Individual",
-            tol: float = 1e-1,
-            use_transformed: bool = False,
-            ) -> bool:
-        """Determine if individual is similar to other based on parameter values.
+        self,
+        other: "Individual",
+        tol: float = 1e-1,
+        use_transformed: bool = False,
+    ) -> bool:
+        """
+        Determine if individual is similar to other based on parameter values.
 
         Parameters
         ----------
@@ -329,7 +337,8 @@ class Individual(Structure):
         return similar_x
 
     def is_similar_f(self, other: "Individual", tol: float = 1e-1) -> bool:
-        """Determine if individual is similar to other based on objective values.
+        """
+        Determine if individual is similar to other based on objective values.
 
         Parameters
         ----------
@@ -349,7 +358,8 @@ class Individual(Structure):
         return similar_f
 
     def is_similar_g(self, other: "Individual", tol: float | None = 1e-1) -> bool:
-        """Determine if individual is similar to other based on constraint values.
+        """
+        Determine if individual is similar to other based on constraint values.
 
         Parameters
         ----------
@@ -369,7 +379,8 @@ class Individual(Structure):
         return similar_g
 
     def is_similar_m(self, other: "Individual", tol: float | None = 1e-1) -> bool:
-        """Determine if individual is similar to other based on meta score values.
+        """
+        Determine if individual is similar to other based on meta score values.
 
         Parameters
         ----------
@@ -389,16 +400,19 @@ class Individual(Structure):
         return similar_m
 
     def __str__(self) -> str:
+        """str: String representation of the individual."""
         return str(list(self.x))
 
     def __repr__(self) -> str:
+        """str: String representation of the individual."""
         if self.g is None:
-            return f'{self.__class__.__name__}({self.x}, {self.f})'
+            return f"{self.__class__.__name__}({self.x}, {self.f})"
         else:
-            return f'{self.__class__.__name__}({self.x}, {self.f}, {self.g})'
+            return f"{self.__class__.__name__}({self.x}, {self.f}, {self.g})"
 
     def to_dict(self) -> dict:
-        """Convert individual to a dictionary.
+        """
+        Convert individual to a dictionary.
 
         Returns
         -------
@@ -439,7 +453,8 @@ class Individual(Structure):
 
     @classmethod
     def from_dict(cls, data: dict) -> "Individual":
-        """Create Individual from dictionary representation of its attributes.
+        """
+        Create Individual from dictionary representation of its attributes.
 
         Parameters
         ----------

@@ -1,16 +1,56 @@
-from collections import defaultdict
 import copy
+from collections import defaultdict
+from typing import Optional
 
 import numpy as np
+import numpy.typing as npt
+from matplotlib.axes import Axes
 
-from CADETProcess import CADETProcessError
-from CADETProcess import plotting
-from CADETProcess.processModel import ComponentSystem
+from CADETProcess import CADETProcessError, plotting
+from CADETProcess.processModel import ComponentSystem, MassActionLaw, ReactionBaseClass
 
 
-def preprocessing(reaction_system, buffer, pH=None, components=None):
+def preprocessing(
+    reaction_system: ReactionBaseClass,
+    buffer: npt.ArrayLike,
+    pH: Optional[float | np.ndarray] = None,
+    components: Optional[list] = None,
+) -> tuple[dict[str, list], dict[str, np.ndarray], np.ndarray, dict[str, int], bool]:
+    """
+    Preprocess reaction system data for further analysis or simulation.
+
+    This function prepares a reaction system by processing buffer concentrations,
+    component indices, and pH values. It calculates pKa values for acids in the system
+    and filters components based on user input.
+
+    Parameters
+    ----------
+    reaction_system : ReactionBaseClass
+        The reaction system containing components and reactions to be processed.
+    buffer : npt.ArrayLike
+        Buffer concentrations.
+    pH : Optional[float | np.ndarray], optional
+        pH value(s) for the system. If None, pH is calculated from the buffer concentrations.
+    components : Optional[list], optional
+        List of components to consider. If None, all components are considered.
+
+    Returns
+    -------
+    tuple[dict[str, list], dict[str, np.ndarray], np.ndarray, dict[str, int], bool]
+        A tuple containing:
+        - pKa: Dictionary mapping component names to lists of pKa values.
+        - c_acids_M: Dictionary mapping component names to their molar concentrations.
+        - pH: Array of pH values.
+        - indices: Dictionary mapping component names to their indices.
+        - scalar_input: Boolean indicating if the input pH was scalar.
+
+    Raises
+    ------
+    CADETProcessError
+        If protons ('H+') are not found in the component system.
+    """
     buffer = np.array(buffer, ndmin=2)
-    buffer_M = 1e-3*buffer
+    buffer_M = 1e-3 * buffer
 
     component_system = copy.deepcopy(reaction_system.component_system)
 
@@ -21,14 +61,14 @@ def preprocessing(reaction_system, buffer, pH=None, components=None):
                 indices.pop(comp)
 
     try:
-        proton_index = indices.pop('H+')
+        proton_index = indices.pop("H+")
     except ValueError:
         raise CADETProcessError("Could not find proton in component system")
 
     if pH is None:
         pH = -np.log10(buffer_M[:, proton_index]).reshape((-1))
     else:
-        pH = np.asarray(pH, dtype='float64')
+        pH = np.asarray(pH, dtype="float64")
 
     scalar_input = False
     if pH.ndim == 0:
@@ -42,13 +82,9 @@ def preprocessing(reaction_system, buffer, pH=None, components=None):
             if not all(r_i in i + proton_index for r_i in reaction_indices):
                 continue
 
-            pKa[comp].append(-np.log10(r.k_eq*1e-3))
+            pKa[comp].append(-np.log10(r.k_eq * 1e-3))
 
-    c_acids_M = {
-        comp: buffer_M[:, i]
-        for comp, i in indices.items()
-        if comp in pKa
-    }
+    c_acids_M = {comp: buffer_M[:, i] for comp, i in indices.items() if comp in pKa}
 
     for comp in indices.copy():
         if comp not in pKa:
@@ -57,8 +93,9 @@ def preprocessing(reaction_system, buffer, pH=None, components=None):
     return pKa, c_acids_M, pH, indices, scalar_input
 
 
-def c_species_nu(pKa, pH):
-    """Compute normalized acid species concentration at given pH.
+def c_species_nu(pKa: list[float], pH: float | list[float]) -> np.ndarray:
+    """
+    Compute normalized acid species concentration at given pH.
 
     Parameters
     ----------
@@ -69,26 +106,26 @@ def c_species_nu(pKa, pH):
 
     Returns
     -------
-    c_species_nu : np.array
+    c_species_nu : np.ndarray
         Normalized acid species concentration.
-
     """
     pKa = np.array([1.0] + pKa)
-    k_eq = 10**(-pKa)
+    k_eq = 10 ** (-pKa)
     n = len(k_eq)
 
     c_H = np.power(10, -pH)
     c_species_nu = np.zeros((n, len(pH)))
 
     for j in range(n):
-        k = np.prod(k_eq[0:j+1])
-        c_species_nu[j] = k*c_H**(n-j)
+        k = np.prod(k_eq[0 : j + 1])
+        c_species_nu[j] = k * c_H ** (n - j)
 
     return c_species_nu
 
 
-def c_total_nu(pKa, pH):
-    """Compute normalized total acid concentration at given pH.
+def c_total_nu(pKa: list[float], pH: float | list[float]) -> np.ndarray:
+    """
+    Compute normalized total acid concentration at given pH.
 
     Parameters
     ----------
@@ -99,15 +136,15 @@ def c_total_nu(pKa, pH):
 
     Returns
     -------
-    c_total_nu : np.array
+    c_total_nu : np.ndarray
         Normalized acid species concentration.
-
     """
     return sum(c_species_nu(pKa, pH))
 
 
-def z_total_nu(pKa, pH):
-    """Compute normalized total charge at given pH.
+def z_total_nu(pKa: list[float], pH: float | list[float]) -> np.ndarray:
+    """
+    Compute normalized total charge at given pH.
 
     Parameters
     ----------
@@ -118,17 +155,17 @@ def z_total_nu(pKa, pH):
 
     Returns
     -------
-    z_total_nu : np.array
+    z_total_nu : np.ndarray
         Normalized acid species concentration.
-
     """
     c = c_species_nu(pKa, pH)
 
     return np.dot(np.arange(len(c)), c)
 
 
-def eta(pKa, pH):
-    """Compute degree of dissociation at given pH.
+def eta(pKa: list[float], pH: float | list[float]) -> np.ndarray:
+    """
+    Compute degree of dissociation at given pH.
 
     Parameters
     ----------
@@ -139,15 +176,19 @@ def eta(pKa, pH):
 
     Returns
     -------
-    eta : np.array
+    eta : np.ndarray
         Degree of dissociation.
-
     """
-    return z_total_nu(pKa, pH)/c_total_nu(pKa, pH)
+    return z_total_nu(pKa, pH) / c_total_nu(pKa, pH)
 
 
-def charge_distribution(reaction_system, pH, components=None):
-    """Calculate charge distribution at given pH.
+def charge_distribution(
+    reaction_system: ReactionBaseClass,
+    pH: float | np.ndarray,
+    components: Optional[list] = None,
+) -> np.ndarray:
+    """
+    Calculate charge distribution at given pH.
 
     Parameters
     ----------
@@ -161,10 +202,9 @@ def charge_distribution(reaction_system, pH, components=None):
 
     Returns
     -------
-    charge_distribution : np.array
+    charge_distribution : np.ndarray
         Degree of protolysis; ratio of the concentration of the species to the
         total concentration.
-
     """
     buffer = reaction_system.n_comp * [1]
     pKa, c_acids_M, pH, indices, scalar_input = preprocessing(
@@ -194,8 +234,13 @@ def charge_distribution(reaction_system, pH, components=None):
     return z
 
 
-def cummulative_charge_distribution(reaction_system, pH, components=None):
-    """Calculate cummulative charge at given pH.
+def cummulative_charge_distribution(
+    reaction_system: ReactionBaseClass,
+    pH: float | np.ndarray,
+    components: Optional[list] = None,
+) -> np.ndarray:
+    """
+    Calculate cummulative charge at given pH.
 
     Parameters
     ----------
@@ -211,7 +256,7 @@ def cummulative_charge_distribution(reaction_system, pH, components=None):
 
     Returns
     -------
-    cummulative_charge_distribution : np.array
+    cummulative_charge_distribution : np.ndarray
         Degree of dissociation;
     """
     buffer = reaction_system.n_comp * [1]
@@ -232,8 +277,9 @@ def cummulative_charge_distribution(reaction_system, pH, components=None):
     return z_cum
 
 
-def alpha(pKa, pH):
-    """Compute degree of protolysis at given pH.
+def alpha(pKa: list, pH: float | list[float]) -> np.ndarray:
+    """
+    Compute degree of protolysis at given pH.
 
     Parameters
     ----------
@@ -244,14 +290,15 @@ def alpha(pKa, pH):
 
     Returns
     -------
-    alpha : np.array
+    alpha : np.ndarray
         Degree of protolysis.
     """
-    return c_species_nu(pKa, pH)/c_total_nu(pKa, pH)
+    return c_species_nu(pKa, pH) / c_total_nu(pKa, pH)
 
 
-def beta(c_acid, pKa, pH):
-    """Compute buffer capacity of acid at given pH.
+def beta(c_acid: type, pKa: list, pH: float | list[float]) -> np.ndarray:
+    """
+    Compute buffer capacity of acid at given pH.
 
     Parameters
     ----------
@@ -264,24 +311,27 @@ def beta(c_acid, pKa, pH):
 
     Returns
     -------
-    beta : np.array
+    beta : np.ndarray
         Buffer capacity.
     """
     a = alpha(pKa, pH)
-    beta = np.zeros(len(pH),)
+    beta = np.zeros(
+        len(pH),
+    )
 
     n = c_acid.shape[1]
     for j in range(1, n):
         for i in range(0, j):
-            beta += (j-i)**2 * a[j] * a[i]
+            beta += (j - i) ** 2 * a[j] * a[i]
 
     beta *= np.log(10) * np.sum(c_acid, axis=1)
 
     return beta
 
 
-def beta_water(pH):
-    """Compute buffer capacity of water.
+def beta_water(pH: float | list[float]) -> np.ndarray:
+    """
+    Compute buffer capacity of water.
 
     Parameters
     ----------
@@ -293,12 +343,18 @@ def beta_water(pH):
     beta_water
         Buffer capacity of water.
     """
-    c_H = 10**(-pH)
-    return np.log(10)*(10**(-14)/c_H + c_H)
+    c_H = 10 ** (-pH)
+    return np.log(10) * (10 ** (-14) / c_H + c_H)
 
 
-def buffer_capacity(reaction_system, buffer, pH=None, components=None):
-    """Calculate buffer capacity at given buffer concentration and pH.
+def buffer_capacity(
+    reaction_system: ReactionBaseClass,
+    buffer: list,
+    pH: Optional[float | np.ndarray] = None,
+    components: list = None,
+) -> np.ndarray:
+    """
+    Calculate buffer capacity at given buffer concentration and pH.
 
     Parameters
     ----------
@@ -314,7 +370,7 @@ def buffer_capacity(reaction_system, buffer, pH=None, components=None):
 
     Returns
     -------
-    buffer_capacity : np.array
+    buffer_capacity : np.ndarray
         Buffer capacity in mM for individual acid components.
         To get overall buffer capacity, component capacities must be summed up.
     """
@@ -322,7 +378,7 @@ def buffer_capacity(reaction_system, buffer, pH=None, components=None):
         reaction_system, buffer, pH, components
     )
 
-    buffer_capacity = np.zeros((len(pH), len(c_acids_M)+1))
+    buffer_capacity = np.zeros((len(pH), len(c_acids_M) + 1))
 
     for i, comp in enumerate(indices):
         buffer_capacity[:, i] = beta(c_acids_M[comp], pKa[comp], pH)
@@ -336,8 +392,9 @@ def buffer_capacity(reaction_system, buffer, pH=None, components=None):
     return buffer_capacity
 
 
-def ionic_strength(component_system, buffer):
-    """Compute ionic strength.
+def ionic_strength(component_system: ComponentSystem, buffer: list) -> np.ndarray:
+    """
+    Compute ionic strength.
 
     Parameters
     ----------
@@ -348,23 +405,28 @@ def ionic_strength(component_system, buffer):
 
     Returns
     -------
-    i: np.array
+    i : np.ndarray
         Ionic strength of buffer
-
     """
     if not isinstance(component_system, ComponentSystem):
         raise TypeError("Expected ComponentSystem")
     if len(buffer) != component_system.n_comp:
         raise CADETProcessError("Number of components does not match")
 
-    buffer = np.asarray(buffer, dtype='float64')
+    buffer = np.asarray(buffer, dtype="float64")
     z = np.asarray(component_system.charges)
-    return 1/2 * np.sum(buffer*z**2)
+    return 1 / 2 * np.sum(buffer * z**2)
 
 
 @plotting.create_and_save_figure
-def plot_buffer_capacity(reaction_system, buffer, pH=None, ax=None):
-    """Plot buffer capacity of reaction system over pH at given concentration.
+def plot_buffer_capacity(
+    reaction_system: MassActionLaw,
+    buffer: list,
+    pH: Optional[np.ndarray] = None,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    """
+    Plot buffer capacity of reaction system over pH at given concentration.
 
     Parameters
     ----------
@@ -372,9 +434,9 @@ def plot_buffer_capacity(reaction_system, buffer, pH=None, ax=None):
         Reaction system with stoichiometric coefficients and reaction rates.
     buffer : list
         Buffer concentration in mM.
-    pH : np.array, optional
+    pH : Optional[np.ndarray]
         Range of pH to be plotted.
-    ax : Axes
+    ax : Optional[Axes]
         Axes to plot on.
 
     Returns
@@ -389,18 +451,18 @@ def plot_buffer_capacity(reaction_system, buffer, pH=None, ax=None):
     b_total = np.sum(b, axis=1)
 
     labels = reaction_system.component_system.names
-    labels.remove('H+')
+    labels.remove("H+")
 
     for i in range(reaction_system.component_system.n_components - 1):
         ax.plot(pH, b[:, i], label=labels[i])
 
-    ax.plot(pH, b[:, -1], label='Water')
-    ax.plot(pH, b_total, 'k--', label='Total buffer capacity')
+    ax.plot(pH, b[:, -1], label="Water")
+    ax.plot(pH, b_total, "k--", label="Total buffer capacity")
 
     layout = plotting.Layout()
-    layout.x_label = '$pH$'
-    layout.y_label = 'buffer capacity / mM'
-    layout.y_lim = (0, 1.1*np.max(b_total))
+    layout.x_label = "$pH$"
+    layout.y_label = "buffer capacity / mM"
+    layout.y_lim = (0, 1.1 * np.max(b_total))
 
     plotting.set_layout(ax, layout)
 
@@ -409,18 +471,23 @@ def plot_buffer_capacity(reaction_system, buffer, pH=None, ax=None):
 
 @plotting.create_and_save_figure
 def plot_charge_distribution(
-        reaction_system, pH=None, plot_cumulative=False, ax=None):
-    """Plot charge distribution of components over pH.
+    reaction_system: MassActionLaw,
+    pH: Optional[np.ndarray] = None,
+    plot_cumulative: Optional[bool] = False,
+    ax: Optional[Axes] = None,
+) -> Axes:
+    """
+    Plot charge distribution of components over pH.
 
     Parameters
     ----------
     reaction_system : MassActionLaw
         Reaction system with stoichiometric coefficients and reaction rates.
-    pH : np.array, optional
+    pH : Optional[np.ndarray]
         Range of pH to be plotted.
-    plot_cumulative : Bool
+    plot_cumulative : Optional[bool]
         If True, only plot cumulative charge of each acid.
-    ax : Axes
+    ax : Optional[Axes]
         Axes to plot on.
 
     Returns
@@ -435,23 +502,23 @@ def plot_charge_distribution(
 
     if plot_cumulative:
         c = cummulative_charge_distribution(reaction_system, pH)
-        layout.y_label = 'degree of dissociation'
+        layout.y_label = "degree of dissociation"
     else:
         c = charge_distribution(reaction_system, pH)
-        layout.y_label = 'degree of protolysis'
+        layout.y_label = "degree of protolysis"
 
     if plot_cumulative:
         labels = reaction_system.component_system.names
     else:
         labels = reaction_system.component_system.species
 
-    labels.remove('H+')
+    labels.remove("H+")
 
-    for i, l in zip(c.T, labels):
-        ax.plot(pH, i, label=l)
+    for i, label in zip(c.T, labels):
+        ax.plot(pH, i, label=label)
 
-    layout.x_label = '$pH$'
-    layout.y_lim = (1.1*np.min(c), 1.1*np.max(c))
+    layout.x_label = "$pH$"
+    layout.y_lim = (1.1 * np.min(c), 1.1 * np.max(c))
 
     plotting.set_layout(ax, layout)
 

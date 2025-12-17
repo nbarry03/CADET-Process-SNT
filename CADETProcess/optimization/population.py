@@ -1,19 +1,26 @@
-from pathlib import Path
-import uuid
+from __future__ import annotations
 
-from addict import Dict
+import uuid
+import warnings
+from pathlib import Path
+from typing import Any, Iterator, Optional
+
 import corner
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import numpy.typing as npt
+from addict import Dict
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from pymoo.visualization.scatter import Scatter
 
-from CADETProcess import CADETProcessError
-from CADETProcess import plotting
-from CADETProcess.optimization.individual import hash_array, Individual
+from CADETProcess import CADETProcessError, plotting
+from CADETProcess.optimization.individual import Individual, hash_array
 
 
-class Population():
-    """Collection of Individuals evaluated during Optimization.
+class Population:
+    """
+    Collection of Individuals evaluated during Optimization.
 
     Attributes
     ----------
@@ -24,11 +31,11 @@ class Population():
     --------
     CADETProcess.optimization.Individual
     ParetoFront
-
     """
 
-    def __init__(self, id=None):
-        """Initialize the Population.
+    def __init__(self, id: Optional[str] = None) -> None:
+        """
+        Initialize the Population.
 
         Parameters
         ----------
@@ -84,7 +91,7 @@ class Population():
 
     @property
     def dimensions(self) -> tuple[int]:
-        """tuple: Individual dimensions (n_x, n_f, n_g, n_m)"""
+        """tuple: Individual dimensions (n_x, n_f, n_g, n_m)."""
         if self.n_individuals == 0:
             return None
 
@@ -132,8 +139,9 @@ class Population():
         self,
         individual: Individual,
         ignore_duplicate: bool | None = True,
-    ):
-        """Add individual to population.
+    ) -> None:
+        """
+        Add individual to population.
 
         Parameters
         ----------
@@ -149,7 +157,6 @@ class Population():
         CADETProcessError
             If the individual does not match the dimensions.
             If the individual already exists.
-
         """
         if not isinstance(individual, Individual):
             raise TypeError("Expected Individual")
@@ -165,8 +172,9 @@ class Population():
 
         self._individuals[individual.id] = individual
 
-    def remove_individual(self, individual):
-        """Remove an individual from the population.
+    def remove_individual(self, individual: Individual) -> None:
+        """
+        Remove an individual from the population.
 
         Parameters
         ----------
@@ -179,7 +187,6 @@ class Population():
             If the individual is not an instance of Individual.
         CADETProcessError
             If the individual is not in the population.
-
         """
         if not isinstance(individual, Individual):
             raise TypeError("Expected Individual")
@@ -188,8 +195,9 @@ class Population():
             raise CADETProcessError("Individual is not in population.")
         self._individuals.pop(individual.id)
 
-    def update(self, other):
-        """Update the population with individuals from another population.
+    def update(self, other: Population) -> None:
+        """
+        Update the population with individuals from another population.
 
         Parameters
         ----------
@@ -202,7 +210,6 @@ class Population():
             If other is not an instance of Population.
         CADETProcessError
             If the dimensions do not match.
-
         """
         if not isinstance(other, Population):
             raise TypeError("Expected Population")
@@ -212,7 +219,7 @@ class Population():
 
         self._individuals.update(other._individuals)
 
-    def remove_similar(self):
+    def remove_similar(self) -> None:
         """Remove similar individuals from the population."""
         for ind in self.individuals.copy():
             to_remove = []
@@ -222,6 +229,8 @@ class Population():
                     continue
 
                 if ind_other.is_similar(ind, self.similarity_tol):
+                    if np.any(ind_other.f == self.f_best):
+                        continue
                     to_remove.append(ind_other)
 
             for i in reversed(to_remove):
@@ -242,158 +251,163 @@ class Population():
 
     @property
     def x(self) -> np.ndarray:
-        """np.array: All evaluated points."""
+        """np.ndarray: All evaluated points."""
         return np.array([ind.x for ind in self.individuals])
 
     @property
     def x_transformed(self) -> np.ndarray:
-        """np.array: All evaluated points in independent transformed space."""
+        """np.ndarray: All evaluated points in independent transformed space."""
         return np.array([ind.x_transformed for ind in self.individuals])
 
     @property
     def cv_bounds(self) -> np.ndarray:
-        """np.array: All evaluated bound constraint violations."""
+        """np.ndarray: All evaluated bound constraint violations."""
         return np.array([ind.cv_bounds for ind in self.individuals])
 
     @property
     def cv_lincon(self) -> np.ndarray:
-        """np.array: All evaluated linear constraint violations."""
+        """np.ndarray: All evaluated linear constraint violations."""
         return np.array([ind.cv_lincon for ind in self.individuals])
 
     @property
     def cv_lineqcon(self) -> np.ndarray:
-        """np.array: All evaluated linear equality constraint violations."""
+        """np.ndarray: All evaluated linear equality constraint violations."""
         return np.array([ind.cv_lineqcon for ind in self.individuals])
 
     @property
     def f(self) -> np.ndarray:
-        """np.array: All evaluated objective function values."""
+        """np.ndarray: All evaluated objective function values."""
         return np.array([ind.f for ind in self.individuals])
 
     @property
     def f_minimized(self) -> np.ndarray:
-        """np.array: All evaluated objective function values, transformed to be minimized."""
+        """np.ndarray: All evaluated objective function values as if minimized."""
         return np.array([ind.f_min for ind in self.individuals])
 
     @property
     def f_best(self) -> np.ndarray:
-        """np.array: Best objective values."""
+        """np.ndarray: Best objective values."""
         f_best = np.min(self.f_minimized, axis=0)
         return np.multiply(self.objectives_minimization_factors, f_best)
 
     @property
     def f_min(self) -> np.ndarray:
-        """np.array: Minimum objective values."""
+        """np.ndarray: Minimum objective values."""
         return np.min(self.f, axis=0)
 
     @property
     def f_max(self) -> np.ndarray:
-        """np.array: Maximum objective values."""
+        """np.ndarray: Maximum objective values."""
         return np.max(self.f, axis=0)
 
     @property
     def f_avg(self) -> np.ndarray:
-        """np.array: Average objective values."""
+        """np.ndarray: Average objective values."""
         return np.mean(self.f, axis=0)
 
     @property
     def g(self) -> np.ndarray:
-        """np.array: All evaluated nonlinear constraint function values."""
+        """np.ndarray: All evaluated nonlinear constraint function values."""
         if self.dimensions[2] > 0:
             return np.array([ind.g for ind in self.individuals])
 
     @property
     def g_best(self) -> np.ndarray:
-        """np.array: Best nonlinear constraint values."""
+        """np.ndarray: Best nonlinear constraint values."""
         indices = np.argmin(self.cv_nonlincon, axis=0)
         return [self.g[ind, i] for i, ind in enumerate(indices)]
 
     @property
     def g_min(self) -> np.ndarray:
-        """np.array: Minimum nonlinear constraint values."""
+        """np.ndarray: Minimum nonlinear constraint values."""
         if self.dimensions[2] > 0:
             return np.min(self.g, axis=0)
 
     @property
     def g_max(self) -> np.ndarray:
-        """np.array: Maximum nonlinear constraint values."""
+        """np.ndarray: Maximum nonlinear constraint values."""
         if self.dimensions[2] > 0:
             return np.max(self.g, axis=0)
 
     @property
     def g_avg(self) -> np.ndarray:
-        """np.array: Average nonlinear constraint values."""
+        """np.ndarray: Average nonlinear constraint values."""
         if self.dimensions[2] > 0:
             return np.mean(self.g, axis=0)
 
     @property
     def cv_nonlincon(self) -> np.ndarray:
-        """np.array: All evaluated nonlinear constraint violation values."""
+        """np.ndarray: All evaluated nonlinear constraint violation values."""
         if self.dimensions[2] > 0:
             return np.array([ind.cv_nonlincon for ind in self.individuals])
 
     @property
     def cv_nonlincon_min(self) -> np.ndarray:
-        """np.array: Minimum nonlinear constraint violation values."""
+        """np.ndarray: Minimum nonlinear constraint violation values."""
         if self.dimensions[2] > 0:
             return np.min(self.cv_nonlincon, axis=0)
 
     @property
     def cv_nonlincon_max(self) -> np.ndarray:
-        """np.array: Maximum nonlinearconstraint violation values."""
+        """np.ndarray: Maximum nonlinearconstraint violation values."""
         if self.dimensions[2] > 0:
             return np.max(self.cv_nonlincon, axis=0)
 
     @property
     def cv_nonlincon_avg(self) -> np.ndarray:
-        """np.array: Average nonlinear constraint violation values."""
+        """np.ndarray: Average nonlinear constraint violation values."""
         if self.dimensions[2] > 0:
             return np.mean(self.cv_nonlincon, axis=0)
 
     @property
     def m(self) -> np.ndarray:
-        """np.array: All evaluated meta scores."""
+        """np.ndarray: All evaluated meta scores."""
         if self.dimensions[3] > 0:
             return np.array([ind.m for ind in self.individuals])
 
     @property
     def m_minimized(self) -> np.ndarray:
-        """np.array: All evaluated meta scores, transformed to be minimized."""
+        """np.ndarray: All evaluated meta scores, transformed to be minimized."""
         if self.dimensions[3] > 0:
             return np.array([ind.m_min for ind in self.individuals])
 
     @property
     def m_best(self) -> np.ndarray:
-        """np.array: Best meta scores."""
+        """np.ndarray: Best meta scores."""
         if self.dimensions[3] > 0:
             m_best = np.min(self.m_minimized, axis=0)
             return np.multiply(self.meta_scores_minimization_factors, m_best)
 
     @property
     def m_min(self) -> np.ndarray:
-        """np.array: Minimum meta scores."""
+        """np.ndarray: Minimum meta scores."""
         if self.dimensions[3] > 0:
             return np.min(self.m, axis=0)
 
     @property
     def m_max(self) -> np.ndarray:
-        """np.array: Maximum meta scores."""
+        """np.ndarray: Maximum meta scores."""
         if self.dimensions[3] > 0:
             return np.max(self.m, axis=0)
 
     @property
     def m_avg(self) -> np.ndarray:
-        """np.array: Average meta scores."""
+        """np.ndarray: Average meta scores."""
         if self.dimensions[3] > 0:
             return np.mean(self.m, axis=0)
 
     @property
     def is_feasilbe(self) -> bool:
-        """np.array: False if any constraint is not met. True otherwise."""
+        """np.ndarray: False if any constraint is not met. True otherwise."""
         return np.array([ind.is_feasible for ind in self.individuals])
 
-    def setup_objectives_figure(self, include_meta=True, plot_individual=False):
-        """Set up figure and axes for plotting objectives.
+    def setup_objectives_figure(
+        self,
+        include_meta: Optional[bool] = True,
+        plot_individual: Optional[bool] = False,
+    ) -> tuple:
+        """
+        Set up figure and axes for plotting objectives.
 
         Parameters
         ----------
@@ -441,17 +455,20 @@ class Population():
             return space_fig_all, space_axs_all
 
     def plot_objectives(
-            self,
-            figs=None, axs=None,
-            include_meta=True,
-            plot_infeasible=True,
-            plot_individual=False,
-            autoscale=True,
-            color_feas='blue',
-            color_infeas='red',
-            show=True,
-            plot_directory=None):
-        """Plot the objective function values for each design variable.
+        self,
+        figs: Optional[Figure | list[Figure]] = None,
+        axs: Optional[Axes | list[list[Axes]]] = None,
+        include_meta: bool = True,
+        plot_infeasible: bool = True,
+        plot_individual: bool = False,
+        autoscale: bool = True,
+        color_feas: str = "blue",
+        color_infeas: str = "red",
+        show: bool = True,
+        plot_directory: Optional[str | Path] = None,
+    ) -> tuple[list[Figure], list[list[Axes]]]:
+        """
+        Plot the objective function values for each design variable.
 
         Parameters
         ----------
@@ -542,7 +559,6 @@ class Population():
                 if autoscale and np.min(x_all) > 0:
                     if np.max(x_all) / np.min(x_all[x_all > 0]) > 100.0:
                         ax.set_xscale("log")
-                        layout.x_label = f"$log_{{10}}$({var})"
 
                 y_min = np.nanmin(v_all)
                 y_max = np.nanmax(v_all)
@@ -551,7 +567,6 @@ class Population():
                 if autoscale and np.min(v_all) > 0:
                     if np.max(v_all) / np.min(v_all[v_all > 0]) > 100.0:
                         ax.set_yscale("log")
-                        layout.y_label = f"$log_{{10}}$({label})"
                         y_lim = (y_min / 2, y_max * 2)
                 if y_min != y_max:
                     layout.y_lim = y_lim
@@ -576,14 +591,18 @@ class Population():
             plot_directory = Path(plot_directory)
             if plot_individual:
                 for i, fig in enumerate(figs):
-                    fig.savefig(f'{plot_directory / "objectives"}_{i}.png')
+                    fig.savefig(f"{plot_directory / 'objectives'}_{i}.png")
             else:
-                figs[0].savefig(f'{plot_directory / "objectives"}.png')
+                figs[0].savefig(f"{plot_directory / 'objectives'}.png")
 
-        return figs, axs
+        if plot_individual:
+            return figs, axs
+        else:
+            return figs[0], axs
 
-    def setup_pareto(self, include_meta: bool = False):
-        """Set up base figure for plotting the Pareto front.
+    def setup_pareto(self, include_meta: bool = False) -> Scatter:
+        """
+        Set up base figure for plotting the Pareto front.
 
         Parameters
         ----------
@@ -610,16 +629,17 @@ class Population():
         return plot
 
     def plot_pareto(
-            self,
-            plot=None,
-            include_meta=True,
-            plot_infeasible=True,
-            color_feas="blue",
-            color_infeas="red",
-            show=True,
-            plot_directory=None,
-            ):
-        """Plot pairwise Pareto fronts for each generation in the optimization.
+        self,
+        plot: Optional[Scatter] = None,
+        include_meta: bool = True,
+        plot_infeasible: bool = True,
+        color_feas: str = "blue",
+        color_infeas: str = "red",
+        show: bool = True,
+        plot_directory: Optional[str | Path] = None,
+    ) -> Scatter:
+        """
+        Plot pairwise Pareto fronts for each generation in the optimization.
 
         The Pareto front represents the optimal solutions that cannot be improved in one
         objective without sacrificing another. The method shows a pairwise Pareto plot,
@@ -675,7 +695,7 @@ class Population():
 
         if plot_directory is not None:
             plot_directory = Path(plot_directory)
-            plot.save(f'{plot_directory / "pareto.png"}')
+            plot.save(f"{plot_directory / 'pareto.png'}")
 
         if not show:
             plt.close(plot.fig)
@@ -684,8 +704,80 @@ class Population():
 
         return plot
 
-    def plot_corner(self, use_transformed=False, show=True, plot_directory=None):
-        """Create a corner plot of the independent variables.
+    def plot_pairwise(
+        self,
+        fig: Optional[plt.Figure] = None,
+        axs: Optional[npt.NDArray[plt.Axes]] = None,
+        n_bins: int = 20,
+        use_transformed: bool = False,
+        autoscale: bool = True,
+        show: bool = True,
+        plot_directory: Optional[str] = None,
+    ) -> tuple[plt.Figure, np.ndarray]:
+        """
+        Create a pairplot using Matplotlib.
+
+        Parameters
+        ----------
+        fig : Optional[plt.Figure], default=None
+            An optional Matplotlib Figure object. If none is provided, a new figure will
+            be created.
+        axs : Optional[npt.NDArray[plt.Axes]], default=None
+            An optional array of Matplotlib Axes. If none is provided, new axes will
+            be created.
+        n_bins : int, default=20
+            Number of bins for histogram plots.
+        use_transformed : bool, optional
+            If True, use the transformed independent variables. The default is False.
+        autoscale : bool, optional
+            If True, automatically adjust the scaling of the axes. The default is True.
+        use_transformed : bool, optional
+            If True, transformed values will be plotted. The default is False.
+        show : bool, optional
+            If True, display the plot. The default is True.
+        plot_directory : str, optional
+            The directory where the plot should be saved. The default is None.
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - plt.Figure: The Matplotlib Figure object.
+            - np.ndarray: An array of Axes objects representing the subplot grid.
+        """
+        if use_transformed:
+            x = self.x_transformed
+            labels = self.independent_variable_names
+        else:
+            x = self.x
+            labels = self.variable_names
+
+        fig, axs = plot_pairwise(
+            x,
+            labels,
+            n_bins=n_bins,
+            autoscale=autoscale,
+            fig=fig,
+            axs=axs,
+        )
+
+        if plot_directory is not None:
+            plot_directory = Path(plot_directory)
+            fig.savefig(f"{plot_directory / 'pairwise.png'}")
+
+        if not show:
+            plt.close(fig)
+
+        return fig, axs
+
+    def plot_corner(
+        self,
+        use_transformed: bool = False,
+        show: bool = True,
+        plot_directory: Optional[str] = None,
+    ) -> None:
+        """
+        Create a corner plot of the independent variables.
 
         Parameters
         ----------
@@ -696,6 +788,12 @@ class Population():
         plot_directory : str, optional
             The directory where the plot should be saved. The default is None.
         """
+        warnings.warn(
+            "This method will be deprecated in the future. "
+            "Use `plot_pairwise` instead.",
+            FutureWarning,
+        )
+
         if use_transformed:
             x = self.x_transformed
             labels = self.independent_variable_names
@@ -732,17 +830,18 @@ class Population():
 
         if plot_directory is not None:
             plot_directory = Path(plot_directory)
-            fig.savefig(f'{plot_directory / "corner.png"}')
+            fig.savefig(f"{plot_directory / 'corner.png'}")
 
         if not show:
             plt.close(fig)
 
-    def __contains__(self, other):
-        """Check if the population contains a specific individual.
+    def __contains__(self, other: Individual | np.ndarray | list) -> bool:
+        """
+        Check if the population contains a specific individual.
 
         Parameters
         ----------
-        other : Individual, np.array, list
+        other : Individual | np.ndarray | list
             The individual or its hashable representation.
 
         Returns
@@ -762,12 +861,13 @@ class Population():
         else:
             return False
 
-    def __getitem__(self, x):
-        """Get an individual from the population using its hashable representation.
+    def __getitem__(self, x: np.ndarray | list) -> Individual:
+        """
+        Get an individual from the population using its hashable representation.
 
         Parameters
         ----------
-        x : np.array, list
+        x : np.ndarray | list
             The hashable representation of the individual.
 
         Returns
@@ -779,8 +879,9 @@ class Population():
 
         return self._individuals[key]
 
-    def __len__(self):
-        """Get the number of individuals in the population.
+    def __len__(self) -> int:
+        """
+        Get the number of individuals in the population.
 
         Returns
         -------
@@ -789,8 +890,9 @@ class Population():
         """
         return self.n_individuals
 
-    def __iter__(self):
-        """Iterate over the individuals in the population.
+    def __iter__(self) -> Iterator[Individual]:
+        """
+        Iterate over the individuals in the population.
 
         Returns
         -------
@@ -799,8 +901,9 @@ class Population():
         """
         return iter(self.individuals)
 
-    def to_dict(self):
-        """Convert Population to a dictionary.
+    def to_dict(self) -> Dict:
+        """
+        Convert Population to a dictionary.
 
         Returns
         -------
@@ -816,8 +919,9 @@ class Population():
         return data
 
     @classmethod
-    def from_dict(cls, data):
-        """Create a Population from a dictionary.
+    def from_dict(cls, data: dict) -> Population:
+        """
+        Create a Population from a dictionary.
 
         Parameters
         ----------
@@ -840,26 +944,43 @@ class Population():
 
 
 class ParetoFront(Population):
-    def __init__(self, similarity_tol=1e-1, *args, **kwargs):
+    """Class representing a Pareto front in a multi-objective optimization problem."""
+
+    def __init__(
+        self,
+        similarity_tol: float = 1e-1,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize a ParetoFront with a specified similarity tolerance.
+
+        Parameters
+        ----------
+        similarity_tol : float, optional
+            Tolerance for similarity between individuals. Default is 1e-1.
+        *args : tuple
+            Additional positional arguments for the parent class.
+        **kwargs : dict
+            Additional keyword arguments for the parent class.
+        """
         self.similarity_tol = similarity_tol
         super().__init__(*args, **kwargs)
 
-    def update_population(self, population: Population):
-        """Update the Pareto front with new population.
-
-        If any individual in the pareto front is dominated, it is removed.
+    def update_population(self, population: Population) -> tuple[list, bool]:
+        """
+        Update the Pareto front with a new population.
 
         Parameters
         ----------
         population : Population
-            Population to update the pareto front with.
+            The population used to update the Pareto front.
 
         Returns
         -------
-        new_members : list
-            New members added to the pareto front.
-        significant_improvement : bool
-            True if pareto front has improved significantly. False otherwise.
+        tuple[list, bool]
+            A tuple containing new members added to the Pareto front and a boolean indicating
+            if there was a significant improvement.
         """
         new_members = []
         significant = []
@@ -935,19 +1056,19 @@ class ParetoFront(Population):
         elif len(self) > 1:
             self.remove_infeasible()
 
-        if self.similarity_tol is not None:
+        if self.similarity_tol:
             self.remove_similar()
 
         return new_members, any(significant)
 
-    def remove_infeasible(self):
-        """Remove infeasible individuals from pareto front."""
+    def remove_infeasible(self) -> None:
+        """Remove infeasible individuals from the Pareto front."""
         for ind in self.individuals.copy():
             if not ind.is_feasible:
                 self.remove_individual(ind)
 
-    def remove_dominated(self):
-        """Remove dominated individuals from pareto front."""
+    def remove_dominated(self) -> None:
+        """Remove dominated individuals from the Pareto front."""
         for ind in self.individuals.copy():
             dominates_one = False
             to_remove = []
@@ -966,40 +1087,181 @@ class ParetoFront(Population):
                 except CADETProcessError:
                     pass
 
-    def to_dict(self):
-        """Convert ParetoFront to a dictionary.
+    def to_dict(self) -> dict:
+        """
+        Convert the ParetoFront to a dictionary.
 
         Returns
         -------
         dict
-            ParetoFront as a dictionary with individuals stored as list of dictionaries.
+            A dictionary representation of the ParetoFront, including individuals and
+            similarity tolerance if set.
         """
         front = super().to_dict()
-        if self.similarity_tol is not None:
+        if self.similarity_tol:
             front["similarity_tol"] = self.similarity_tol
 
         return front
 
     @classmethod
-    def from_dict(cls, data):
-        """Create ParetoFront from dictionary.
+    def from_dict(cls, data: dict) -> ParetoFront:
+        """
+        Create a ParetoFront instance from a dictionary.
 
         Parameters
         ----------
         data : dict
-            Dictionary containing population data.
+            Dictionary containing the ParetoFront data.
 
         Returns
         -------
         ParetoFront
-            ParetoFront created from data.
+            An instance of ParetoFront created from the dictionary.
         """
-        front = cls(
-            similarity_tol=data["similarity_tol"],
-            id=data["id"]
-        )
+        front = cls(similarity_tol=data.get("similarity_tol"), id=data["id"])
         for individual_data in data["individuals"].values():
             individual = Individual.from_dict(individual_data)
             front.add_individual(individual)
 
         return front
+
+
+def plot_pairwise(
+    population: npt.ArrayLike,
+    variable_names: Optional[list[str]] = None,
+    n_bins: int = 20,
+    autoscale: bool = True,
+    fig: Optional[plt.Figure] = None,
+    axs: Optional[np.ndarray[plt.Axes]] = None,
+) -> tuple[plt.Figure, np.ndarray[plt.Axes]]:
+    """
+    Create a pairwise scatter plot for all variables of a population.
+
+    Parameters
+    ----------
+    population : npt.ArrayLike
+        3D array-like structure containing numerical variables with shape
+        (n_chains, n_samples, n_variables)
+    variable_names : list of str, optional
+        list of variable names corresponding to columns in the data.
+        If None, default names will be assigned.
+    n_bins : int, default=20
+        Number of bins for histogram plots.
+    autoscale : bool, default=True
+        If True, automatically adjust the scaling of the axes.
+    fig : Optional[plt.Figure], default=None
+        An optional Matplotlib Figure object. If none is provided, a new figure will be
+        created.
+    axs : Optional[npt.NDArray[plt.Axes]], default=None
+        An optional array of Matplotlib Axes. If none is provided, new axes will be
+        created.
+
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - plt.Figure: The Matplotlib Figure object.
+        - npt.NDArray[plt.Axes]: An array of Axes objects representing the subplot grid.
+    """
+    population = np.array(population)
+
+    if population.ndim != 2:
+        raise ValueError(f"Expected 2D array, got array with ndim={population.ndim}")
+
+    n_samples, n_variables = population.shape
+
+    if variable_names is None:
+        variable_names = [f"$x_{i}$" for i in range(n_variables)]
+
+    if fig is None and axs is None:
+        fig, axs = plt.subplots(
+            n_variables,
+            n_variables,
+            figsize=(6 * n_variables, 5 * n_variables),
+            sharex="col",
+            sharey="row",
+            squeeze=False,
+        )
+
+    if axs.shape != (n_variables, n_variables):
+        raise ValueError(
+            "Inconsistent shape for provided axes."
+            f"Expected {(n_variables, n_variables)}, got {axs.shape}."
+        )
+
+    # Rows
+    for i in range(n_variables):
+        scale_i = False
+        if autoscale and np.all(population[:, i] > 0):
+            value_range = population[:, i].max() / population[:, i].min()
+            if value_range > 100.0:
+                scale_i = True
+
+        # Columns
+        for j in range(n_variables):
+            scale_j = False
+            if autoscale and np.all(population[:, j] > 0):
+                value_range = population[:, j].max() / population[:, j].min()
+                if value_range > 100.0:
+                    scale_j = True
+
+            ax = axs[i, j]
+            if i == j:
+                # Create a twin axis for histograms to avoid sharing y-axis
+                ax_hist = ax.twinx()
+
+                # Determine binning strategy
+                if scale_i:
+                    bins = np.geomspace(
+                        population[:, i].min(), population[:, i].max(), n_bins + 1
+                    )
+                else:
+                    bins = np.linspace(
+                        population[:, i].min(), population[:, i].max(), n_bins + 1
+                    )
+
+                ax_hist.hist(
+                    population[:, i],
+                    bins=bins,
+                    alpha=0.7,
+                    color="blue",
+                    edgecolor="black",
+                    align="mid",
+                )
+                ax_hist.set_yticks([])  # Hide y-ticks for the histogram
+            else:
+                # Scatter plot for non-diagonal elements
+                ax.scatter(population[:, j], population[:, i], alpha=0.5, s=10)
+
+            # Apply log scale based on autoscale logic
+            if scale_j:
+                ax.set_xscale("log")
+            if scale_i:
+                ax.set_yscale("log")
+
+            # Ensure axis labels and ticks are visible only on the
+            # first column
+            if j == 0:
+                ax.yaxis.set_tick_params(labelleft=True)
+                if not scale_i:
+                    ax.ticklabel_format(axis="y", useMathText=True, scilimits=[-3, 3])
+            else:
+                ax.yaxis.set_tick_params(labelleft=False)
+
+            # and last row
+            if i == n_variables - 1:
+                ax.xaxis.set_tick_params(labelbottom=True)
+                if not scale_j:
+                    ax.ticklabel_format(axis="x", useMathText=True, scilimits=[-3, 3])
+            else:
+                ax.xaxis.set_tick_params(labelbottom=False)
+
+            # Set axis labels on the edges
+            if i == n_variables - 1:
+                ax.set_xlabel(variable_names[j])
+            if j == 0:
+                ax.set_ylabel(variable_names[i])
+
+    fig.tight_layout()
+
+    return fig, axs

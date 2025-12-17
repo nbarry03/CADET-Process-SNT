@@ -14,32 +14,35 @@ comparison with ``SimulationResults``
     ReferenceBase
     ReferenceIO
 
-"""
+"""  # noqa
+
+from typing import Any, Optional
 
 import numpy as np
+import numpy.typing as npt
 
 from CADETProcess import CADETProcessError
 from CADETProcess.processModel import ComponentSystem
 from CADETProcess.solution import SolutionBase, SolutionIO
 
-
-__all__ = ['ReferenceBase', 'ReferenceIO', 'FractionationReference']
+__all__ = ["ReferenceBase", "ReferenceIO", "FractionationReference"]
 
 
 class ReferenceBase(SolutionBase):
-    """Class representing references to be compared with SimulationResults.
+    """
+    Class representing references to be compared with SimulationResults.
 
     See Also
     --------
     CADETProcess.solution.SolutionBase
-
     """
 
     pass
 
 
 class ReferenceIO(ReferenceBase, SolutionIO):
-    """A class representing reference data of inlet or outlet concentration profiles.
+    """
+    A class representing reference data of inlet or outlet concentration profiles.
 
     Attributes
     ----------
@@ -58,13 +61,18 @@ class ReferenceIO(ReferenceBase, SolutionIO):
     --------
     CADETProcess.reference.ReferenceBase
     CADETProcess.solution.SolutionIO
-
     """
 
     def __init__(
-            self, name, time, solution,
-            flow_rate=None, component_system=None):
-        """Initialize a ReferenceIO object.
+        self,
+        name: str,
+        time: npt.ArrayLike,
+        solution: npt.ArrayLike,
+        flow_rate: Optional[float | npt.ArrayLike] = None,
+        component_system: Optional[ComponentSystem] = None,
+    ) -> None:
+        """
+        Initialize a ReferenceIO object.
 
         Parameters
         ----------
@@ -89,7 +97,6 @@ class ReferenceIO(ReferenceBase, SolutionIO):
         ValueError
             If the time and solution arrays are not the same length.
             If the flow rate array and time array are not the same length.
-
         """
         time = np.array(time, dtype=np.float64).reshape(-1)
 
@@ -106,14 +113,15 @@ class ReferenceIO(ReferenceBase, SolutionIO):
 
         if flow_rate is None:
             flow_rate = 1
-        if isinstance(flow_rate, (int,  float)):
+        if isinstance(flow_rate, (int, float)):
             flow_rate = flow_rate * np.ones(time.shape)
 
         super().__init__(name, component_system, time, solution, flow_rate)
 
 
 class FractionationReference(ReferenceBase):
-    """A class representing reference data of fractionation data.
+    """
+    A class representing reference data of fractionation data.
 
     Attributes
     ----------
@@ -132,9 +140,17 @@ class FractionationReference(ReferenceBase):
     CADETProcess.fractionation.Fraction
     """
 
-    dimensions = SolutionBase.dimensions + ['component_coordinates']
+    dimensions = SolutionBase.dimensions + ["component_coordinates"]
 
-    def __init__(self, name, fractions, component_system=None, *args, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        fractions: list,
+        component_system: Optional[ComponentSystem] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize FractionationReference object."""
         from CADETProcess.fractionation import Fraction
 
         for frac in fractions:
@@ -147,7 +163,7 @@ class FractionationReference(ReferenceBase):
 
         self.fractions = fractions
 
-        time = np.array([(frac.start + frac.end)/2 for frac in self.fractions])
+        time = np.array([(frac.start + frac.end) / 2 for frac in self.fractions])
         solution = np.array([frac.mass / frac.volume for frac in self.fractions])
 
         if component_system is None:

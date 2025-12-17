@@ -1,14 +1,14 @@
 from collections import defaultdict
 from functools import wraps
-from typing import NoReturn
+from typing import Any, Iterator
 
 from addict import Dict
 
 from CADETProcess import CADETProcessError
-from CADETProcess.dataStructure import Structure
-from CADETProcess.dataStructure import String, Integer, UnsignedFloat
+from CADETProcess.dataStructure import Integer, String, Structure, UnsignedFloat
 
-__all__ = ['ComponentSystem', 'Component', 'Species']
+__all__ = ["ComponentSystem", "Component", "Species"]
+
 
 class Species(Structure):
     """
@@ -26,12 +26,16 @@ class Species(Structure):
         The molecular weight of the species.
     density : float
         Density of the species.
-
     """
+
     name: String = String()
     charge: Integer = Integer(default=0)
     molecular_weight: UnsignedFloat = UnsignedFloat()
     density: UnsignedFloat = UnsignedFloat()
+
+    def __str__(self) -> str:
+        """str: String representation of the component."""
+        return self.name
 
 
 class Component(Structure):
@@ -61,31 +65,33 @@ class Component(Structure):
     --------
     Species
     ComponentSystem
-
     """
+
     name: String = String()
 
     def __init__(
-            self,
-            name: str | None = None,
-            species: str | list[str | None] = None,
-            charge: int | list[int | None] = None,
-            molecular_weight: float | list[float | None] = None,
-            density: float | list[float | None] = None
-            ) -> NoReturn:
+        self,
+        name: str | None = None,
+        species: str | list[str | None] = None,
+        charge: int | list[int | None] = None,
+        molecular_weight: float | list[float | None] = None,
+        density: float | list[float | None] = None,
+    ) -> None:
         """
+        Initialize Component.
+
         Parameters
         ----------
         name : str | None
             Name of the component.
         species : str | list[str | None]
-            Names of the subspecies.
+            Name(s) of the subspecies to initialize. If None, the component's name is used.
         charge : int | list [int | None]
-            Charges of the subspecies.
+            Charges of the subspecies. Defaults to None for each species.
         molecular_weight : float | list[float | None]
-            Molecular weights of the subspecies.
+            Molecular weights of the subspecies. Defaults to None for each species.
         density : float | list[float | None]
-            Density of component (including species).
+            Density of component (including species). Defaults to None for each species.
         """
         self.name: str | None = name
         self._species: list[Species] = []
@@ -113,16 +119,18 @@ class Component(Structure):
 
     @wraps(Species.__init__)
     def add_species(
-            self,
-            species: str| Species ,
-            *args,
-            **kwargs
-            ) -> Species:
+        self,
+        species: str | Species,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Species:
         """
         Add a subspecies to the component.
 
         Parameters
         ----------
+        species: string | Species
+            Species to add
         *args
             Variable length argument list.
         **kwargs
@@ -167,7 +175,7 @@ class Component(Structure):
         """str: String representation of the component."""
         return self.name
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Species]:
         """Iterate over the subspecies of the component."""
         yield from self.species
 
@@ -207,18 +215,18 @@ class ComponentSystem(Structure):
     --------
     Species
     Component
-
     """
+
     name: String = String()
 
     def __init__(
-            self,
-            components: int | list[str | Component | None] = None,
-            name: str | None = None,
-            charges: list[int | None] = None,
-            molecular_weights: list[float | None] = None,
-            densities: list[float | None] = None
-            ) -> None:
+        self,
+        components: int | list[str | Component | None] = None,
+        name: str | None = None,
+        charges: list[int | None] = None,
+        molecular_weights: list[float | None] = None,
+        densities: list[float | None] = None,
+    ) -> None:
         """
         Initialize the ComponentSystem object.
 
@@ -240,9 +248,7 @@ class ComponentSystem(Structure):
         ------
         CADETProcessError
             If the `components` argument is neither an int nor a list.
-
         """
-
         self.name: str | None = name
         self._components: list[Component] = []
 
@@ -269,7 +275,7 @@ class ComponentSystem(Structure):
                 comp,
                 charge=charges[i],
                 molecular_weight=molecular_weights[i],
-                density=densities[i]
+                density=densities[i],
             )
 
     @property
@@ -280,10 +286,7 @@ class ComponentSystem(Structure):
     @property
     def components_dict(self) -> dict[str, Component]:
         """dict[str, Component]: Components indexed by name."""
-        return {
-            name: comp
-            for name, comp in zip(self.names, self.components)
-        }
+        return {name: comp for name, comp in zip(self.names, self.components)}
 
     @property
     def n_components(self) -> int:
@@ -302,11 +305,11 @@ class ComponentSystem(Structure):
 
     @wraps(Component.__init__)
     def add_component(
-            self,
-            component: str | Component,
-            *args: list,
-            **kwargs: dict
-            ) -> NoReturn:
+        self,
+        component: str | Component,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         """
         Add a component to the system.
 
@@ -314,24 +317,22 @@ class ComponentSystem(Structure):
         ----------
         component : str | Component
             The component instance or name of the component to be added.
-        *args : list
+        *args : Any
             The positional arguments to be passed to the component class's constructor.
-        **kwargs : dict
+        **kwargs : Any
             The keyword arguments to be passed to the component class's constructor.
-
         """
         if not isinstance(component, Component):
             component = Component(component, *args, **kwargs)
 
         if component.name in self.names:
             raise CADETProcessError(
-                f"Component '{component.name}' "
-                "already exists in ComponentSystem."
+                f"Component '{component.name}' already exists in ComponentSystem."
             )
 
         self._components.append(component)
 
-    def remove_component(self, component: str | Component) -> NoReturn:
+    def remove_component(self, component: str | Component) -> None:
         """
         Remove a component from the system.
 
@@ -344,7 +345,6 @@ class ComponentSystem(Structure):
         ------
         CADETProcessError
             If the component is unknown or not present in the system.
-
         """
         if isinstance(component, str):
             try:
@@ -438,10 +438,14 @@ class ComponentSystem(Structure):
 
     def __repr__(self) -> str:
         """str: Return the string representation of the object."""
-        return f'{self.__class__.__name__}({self.names})'
+        return f"{self.__class__.__name__}({self.names})"
 
-    def __iter__(self):
-        """Iterator over components in the system."""
+    def __len__(self) -> int:
+        """int: Return the number of components in the system."""
+        return self.n_comp
+
+    def __iter__(self) -> Iterator[Component]:
+        """Iterate over components in the system."""
         yield from self.components
 
     def __getitem__(self, item: int) -> Component:

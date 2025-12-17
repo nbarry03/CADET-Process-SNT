@@ -1,32 +1,38 @@
 from functools import partial
+
 import numpy as np
 import pytest
-
 from CADETProcess.optimization import (
-    OptimizerBase,
-    TrustConstr,
     COBYLA,
-    NelderMead,
     SLSQP,
     U_NSGA3,
-    GPEI,
-    NEHVI,
-    qNParEGO,
+    NelderMead,
+    OptimizerBase,
+    TrustConstr,
 )
 
+skip_ax = False
+try:
+    from CADETProcess.optimization import (
+        GPEI,
+        NEHVI,
+        qNParEGO,
+    )
+except ImportError:
+    skip_ax = True
 
 from tests.optimization_problem_fixtures import (
-    TestProblem,
-    Rosenbrock,
+    LinearConstraintsMooTestProblem,
     LinearConstraintsSooTestProblem,
     LinearConstraintsSooTestProblem2,
     LinearEqualityConstraintsSooTestProblem,
-    NonlinearConstraintsSooTestProblem,
-    NonlinearLinearConstraintsSooTestProblem,
-    LinearConstraintsMooTestProblem,
     LinearNonlinearConstraintsMooTestProblem,
     NonlinearConstraintsMooTestProblem,
-)
+    NonlinearConstraintsSooTestProblem,
+    NonlinearLinearConstraintsSooTestProblem,
+    Rosenbrock,
+    TestProblem,
+)  # noqa: E402
 
 # %% Optimizer Setup
 
@@ -54,13 +60,11 @@ EXCLUDE_COMBINATIONS = [
         U_NSGA3,
         LinearEqualityConstraintsSooTestProblem,
         "See also: https://jugit.fz-juelich.de/IBG-1/ModSim/hopsy/-/issues/152",
-    ),
-    (GPEI, Rosenbrock, "cannot solve problem with enough accuracy fast enough."),
+    )
 ]
 
 # this helps to test optimizers for hard problems
 NON_DEFAULT_PARAMETERS = [
-    (NEHVI, LinearConstraintsMooTestProblem, {"n_init_evals": 20, "n_max_evals": 40}),
     (U_NSGA3, NonlinearConstraintsMooTestProblem, {"pop_size": 300, "n_max_gen": 40}),
     (U_NSGA3, Rosenbrock, {"pop_size": 300, "n_max_gen": 20}),
 ]
@@ -108,31 +112,32 @@ class U_NSGA3(U_NSGA3):
     n_max_gen = 20  # before used 100 generations --> this did not improve the fit
 
 
-class GPEI(GPEI):
-    cv_lincon_tol = CV_LINCON_TOL
-    n_init_evals = 40
-    early_stopping_improvement_bar = 1e-4
-    early_stopping_improvement_window = 10
-    n_max_evals = 50
+if not skip_ax:
 
+    class GPEI(GPEI):
+        cv_lincon_tol = CV_LINCON_TOL
+        n_init_evals = 40
+        early_stopping_improvement_bar = 1e-4
+        early_stopping_improvement_window = 10
+        n_max_evals = 50
 
-class NEHVI(NEHVI):
-    cv_lincon_tol = CV_LINCON_TOL
-    n_init_evals = 50
-    early_stopping_improvement_bar = 1e-4
-    early_stopping_improvement_window = 10
-    n_max_evals = 60
+    class NEHVI(NEHVI):
+        cv_lincon_tol = CV_LINCON_TOL
+        n_init_evals = 50
+        early_stopping_improvement_bar = 1e-4
+        early_stopping_improvement_window = 10
+        n_max_evals = 60
 
-
-class qNParEGO(qNParEGO):
-    cv_lincon_tol = CV_LINCON_TOL
-    n_init_evals = 50
-    early_stopping_improvement_bar = 1e-4
-    early_stopping_improvement_window = 10
-    n_max_evals = 70
+    class qNParEGO(qNParEGO):
+        cv_lincon_tol = CV_LINCON_TOL
+        n_init_evals = 50
+        early_stopping_improvement_bar = 1e-4
+        early_stopping_improvement_window = 10
+        n_max_evals = 70
 
 
 # %% Test problem factory
+
 
 @pytest.fixture(
     params=[
@@ -143,12 +148,10 @@ class qNParEGO(qNParEGO):
         NonlinearConstraintsSooTestProblem,
         LinearEqualityConstraintsSooTestProblem,
         NonlinearLinearConstraintsSooTestProblem,
-
         # multi objective problems
         LinearConstraintsMooTestProblem,
         NonlinearConstraintsMooTestProblem,
         LinearNonlinearConstraintsMooTestProblem,
-
         # transformed problems
         partial(LinearConstraintsSooTestProblem, transform="linear"),
         partial(LinearEqualityConstraintsSooTestProblem, transform="linear"),
@@ -159,18 +162,33 @@ def optimization_problem(request):
     return request.param(use_diskcache=False)
 
 
-@pytest.fixture(
-    params=[
-        TrustConstr,
-        COBYLA,
-        SLSQP,
-        NelderMead,
-        U_NSGA3,
-        GPEI,
-        NEHVI,
-        qNParEGO,
-    ]
-)
+params = [
+    TrustConstr,
+    COBYLA,
+    SLSQP,
+    NelderMead,
+    U_NSGA3,
+]
+
+if not skip_ax:
+    params.extend(
+        [
+            GPEI,
+            NEHVI,
+            qNParEGO,
+        ]
+    )
+    EXCLUDE_COMBINATIONS.append(
+        (GPEI, Rosenbrock, "cannot solve problem with enough accuracy fast enough.")
+    )
+
+    # this helps to test optimizers for hard problems
+    NON_DEFAULT_PARAMETERS.append(
+        (NEHVI, LinearConstraintsMooTestProblem, {"n_init_evals": 20, "n_max_evals": 40})
+    )
+
+
+@pytest.fixture(params=params)
 def optimizer(request):
     optimizer = request.param()
     optimizer.progress_freqency = None
@@ -178,7 +196,7 @@ def optimizer(request):
 
 
 # %% Tests
-
+@pytest.mark.slow
 def test_convergence(optimization_problem: TestProblem, optimizer: OptimizerBase):
     # only test problems that the optimizer can handle. The rest of the tests
     # will be marked as passed
@@ -195,10 +213,10 @@ def test_convergence(optimization_problem: TestProblem, optimizer: OptimizerBase
             optimization_problem.test_if_solved(results, MOO_TEST_KWARGS)
 
 
+@pytest.mark.slow
 def test_from_initial_values(
     optimization_problem: TestProblem, optimizer: OptimizerBase
 ):
-
     if optimizer.check_optimization_problem(optimization_problem):
         skip_if_combination_excluded(optimizer, optimization_problem)
         set_non_default_parameters(optimizer, optimization_problem)
@@ -234,6 +252,7 @@ class AbortingCallback:
         self.n_calls += 1
 
 
+@pytest.mark.slow
 def test_resume_from_checkpoint(
     optimization_problem: TestProblem, optimizer: OptimizerBase
 ):
@@ -241,7 +260,6 @@ def test_resume_from_checkpoint(
 
     # TODO: Do we need to run this for all problems?
     if optimizer.check_optimization_problem(optimization_problem):
-
         callback = AbortingCallback(n_max_evals=2, abort=True)
         optimization_problem.add_callback(callback)
 

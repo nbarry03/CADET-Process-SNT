@@ -1,31 +1,36 @@
-from collections import defaultdict
+from __future__ import annotations
+
 import copy
 import warnings
+from collections import defaultdict
+from typing import Any, Callable, Optional, Type
 
-from addict import Dict
 import numpy as np
+from addict import Dict
 from matplotlib.axes import Axes
 
-
-from CADETProcess import CADETProcessError
-
-from CADETProcess.dataStructure import Structure, frozen_attributes
+from CADETProcess import CADETProcessError, plotting
 from CADETProcess.dataStructure import (
-    ParameterBase, Bool, Integer, Float, Sized, Typed, UnsignedFloat, NdPolynomial,
+    Bool,
+    CachedPropertiesMixin,
+    Float,
+    Integer,
+    ParameterBase,
+    Sized,
+    Structure,
+    Typed,
+    UnsignedFloat,
+    cached_property_if_locked,
+    check_nested,
+    frozen_attributes,
+    generate_nested_dict,
+    get_nested_attribute,
+    get_nested_value,
 )
-from CADETProcess.dataStructure import (
-    CachedPropertiesMixin, cached_property_if_locked
-)
 
-from CADETProcess.dataStructure import (
-    check_nested, generate_nested_dict, get_nested_value, get_nested_attribute
-)
+from .section import MultiTimeLine, Section, TimeLine, generate_indices, unravel
 
-from CADETProcess import plotting
-from .section import Section, TimeLine, MultiTimeLine, generate_indices, unravel
-
-
-__all__ = ['EventHandler', 'Event', 'Duration']
+__all__ = ["EventHandler", "Event", "Duration"]
 
 
 @frozen_attributes
@@ -89,7 +94,8 @@ class EventHandler(CachedPropertiesMixin, Structure):
 
     cycle_time = UnsignedFloat(default=np.inf)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Construct for EventHandler."""
         super().__init__(*args, **kwargs)
 
         self._events = []
@@ -97,8 +103,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         self._lock = False
 
     @cached_property_if_locked
-    def events(self):
-        """list: All Events ordered by event time.
+    def events(self) -> list[Event]:
+        """
+        list: All Events ordered by event time.
 
         See Also
         --------
@@ -112,16 +119,25 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return sorted(self._events, key=lambda evt: evt.time)
 
     @cached_property_if_locked
-    def events_dict(self):
-        """dict: Events and Durations orderd by name."""
+    def events_dict(self) -> dict[str, Event | Duration]:
+        """Return Events and Durations orderd by name."""
         evts = {evt.name: evt for evt in self.events}
         durs = {dur.name: dur for dur in self.durations}
         return {**evts, **durs}
 
     def add_event(
-            self, name, parameter_path, state, time=0.0, indices=None,
-            dependencies=None, factors=None, transforms=None):
-        """Add a new event that changes a parameter during the process.
+        self,
+        name: str,
+        parameter_path: str,
+        state: float,
+        time: float = 0.0,
+        indices: int = None,
+        dependencies: list = None,
+        factors: list = None,
+        transforms: Optional[list] = None,
+    ) -> Event:
+        """
+        Add a new event that changes a parameter during the process.
 
         An event is a dynamic alteration that occurs at a specified time and can modify
         the attributes of specific objects involved in the process.
@@ -147,6 +163,11 @@ class EventHandler(CachedPropertiesMixin, Structure):
             Length must be equal the length of independent events.
             If None, no transform is applied.
 
+        Returns
+        -------
+        Event:
+            The new Event.
+
         Raises
         ------
         CADETProcessError
@@ -171,14 +192,13 @@ class EventHandler(CachedPropertiesMixin, Structure):
         super().__setattr__(name, evt)
 
         if dependencies is not None:
-            self.add_event_dependency(
-                evt.name, dependencies, factors, transforms
-            )
+            self.add_event_dependency(evt.name, dependencies, factors, transforms)
 
         return evt
 
-    def remove_event(self, evt_name):
-        """Remove a specified event from the event handler.
+    def remove_event(self, evt_name: str) -> None:
+        """
+        Remove a specified event from the event handler.
 
         This method ensures that the specified event will no longer influence the
         process by dynamically changing any attributes.
@@ -202,7 +222,6 @@ class EventHandler(CachedPropertiesMixin, Structure):
         add_event
         Event
         Event.remove_dependency
-
         """
         try:
             evt = self.events_dict[evt_name]
@@ -212,8 +231,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         self._events.remove(evt)
         self.__dict__.pop(evt_name)
 
-    def add_duration(self, name, time=0.0):
-        """Register a new duration or time point of interest.
+    def add_duration(self, name: str, time: float = 0.0) -> "Duration":
+        """
+        Register a new duration or time point of interest.
 
         Durations are specific moments in the process that do not necessarily modify
         attributes but are noteworthy or need to be tracked.
@@ -224,6 +244,11 @@ class EventHandler(CachedPropertiesMixin, Structure):
             Name of the event.
         time : float
             Time point for perfoming the event.
+
+        Returns
+        -------
+        Event:
+            The new Event.
 
         Raises
         ------
@@ -237,7 +262,6 @@ class EventHandler(CachedPropertiesMixin, Structure):
         Duration
         add_event
         add_event_dependency
-
         """
         if name in self.events_dict:
             raise CADETProcessError("Duration already exists")
@@ -247,15 +271,18 @@ class EventHandler(CachedPropertiesMixin, Structure):
         self._durations.append(dur)
         super().__setattr__(name, dur)
 
-    def remove_duration(self, duration_name):
-        """Remove a specified duration or time point from tracking.
+        return dur
+
+    def remove_duration(self, duration_name: str) -> None:
+        """
+        Remove a specified duration or time point from tracking.
 
         This method ensures that the specified duration is no longer considered a point
         of interest in the process.
 
         Parameters
         ----------
-        duration : str
+        duration_name : str
             Name of the duration be removed from the EventHandler.
 
         Raises
@@ -268,7 +295,6 @@ class EventHandler(CachedPropertiesMixin, Structure):
         add_duration
         Duration
         remove_event_dependency
-
         """
         try:
             dur = self.events_dict[duration_name]
@@ -279,14 +305,19 @@ class EventHandler(CachedPropertiesMixin, Structure):
         self.__dict__.pop(duration_name)
 
     @cached_property_if_locked
-    def durations(self):
+    def durations(self) -> list["Duration"]:
         """List of all durations in the process."""
         return self._durations
 
     def add_event_dependency(
-            self, dependent_event, independent_events,
-            factors=None, transforms=None):
-        """Create a dependency relationship between events.
+        self,
+        dependent_event: str,
+        independent_events: list,
+        factors: Optional[list] = None,
+        transforms: Optional[list] = None,
+    ) -> None:
+        """
+        Create a dependency relationship between events.
 
         This method establishes how one event (dependent) is influenced by one or more
         other events (independents) through factors and optional transformation
@@ -322,7 +353,6 @@ class EventHandler(CachedPropertiesMixin, Structure):
         add_event
         add_duration
         remove_event_dependency
-
         """
         try:
             evt = self.events_dict[dependent_event]
@@ -332,12 +362,10 @@ class EventHandler(CachedPropertiesMixin, Structure):
         if not isinstance(independent_events, list):
             independent_events = [independent_events]
         if not all(indep in self.events_dict for indep in independent_events):
-            raise CADETProcessError(
-                "Cannot find one or more independent events"
-            )
+            raise CADETProcessError("Cannot find one or more independent events")
 
         if factors is None:
-            factors = [1]*len(independent_events)
+            factors = [1] * len(independent_events)
 
         if not isinstance(factors, list):
             factors = [factors]
@@ -346,7 +374,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
                 "Length of factors must equal length of independent Events"
             )
         if transforms is None:
-            transforms = [None]*len(independent_events)
+            transforms = [None] * len(independent_events)
 
         if not isinstance(transforms, list):
             transforms = [transforms]
@@ -359,8 +387,11 @@ class EventHandler(CachedPropertiesMixin, Structure):
             indep = self.events_dict[indep]
             evt.add_dependency(indep, fac, trans)
 
-    def remove_event_dependency(self, dependent_event, independent_events):
-        """Remove a previously defined dependency between events.
+    def remove_event_dependency(
+        self, dependent_event: str, independent_events: list
+    ) -> None:
+        """
+        Remove a previously defined dependency between events.
 
         Parameters
         ----------
@@ -387,37 +418,33 @@ class EventHandler(CachedPropertiesMixin, Structure):
             raise CADETProcessError("Cannot find dependent Event")
 
         if not all(evt in self.events_dict for evt in independent_events):
-            raise CADETProcessError(
-                "Cannot find one or more independent events"
-            )
+            raise CADETProcessError("Cannot find one or more independent events")
 
         for indep in independent_events:
             self.events[dependent_event].remove_dependency(indep)
 
     @cached_property_if_locked
-    def independent_events(self):
+    def independent_events(self) -> list[Event]:
         """list: All events that are not dependent on other events."""
         return list(filter(lambda evt: evt.is_independent, self.events))
 
     @cached_property_if_locked
-    def dependent_events(self):
+    def dependent_events(self) -> list[Event]:
         """list: All events that are dependent on other events."""
-        return list(
-            filter(lambda evt: evt.is_independent is False, self.events)
-        )
+        return list(filter(lambda evt: evt.is_independent is False, self.events))
 
     @cached_property_if_locked
-    def event_parameters(self):
+    def event_parameters(self) -> list[str]:
         """list: Event parameters."""
         return list({evt.parameter_path for evt in self.events})
 
     @cached_property_if_locked
-    def event_performers(self):
+    def event_performers(self) -> list[str]:
         """list: Event peformers."""
         return list({evt.performer for evt in self.events})
 
     @cached_property_if_locked
-    def event_times(self):
+    def event_times(self) -> list[float]:
         """list: Time of events, sorted by Event time."""
         event_times = list({evt.time for evt in self.events})
         event_times.sort()
@@ -425,8 +452,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return event_times
 
     @cached_property_if_locked
-    def section_times(self):
-        """list: Section times.
+    def section_times(self) -> list[float]:
+        """
+        list: Section times.
 
         Includes 0 and cycle_time if they do not coincide with event time.
 
@@ -444,13 +472,13 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return section_times
 
     @property
-    def n_sections(self):
+    def n_sections(self) -> int:
         """int: Number of sections."""
         return len(self.section_times) - 1
 
     @cached_property_if_locked
-    def section_states(self):
-        """dict: State of event parameters at every section."""
+    def section_states(self) -> Dict[float, dict[float, np.ndarray]]:
+        """Return state of event parameters at every section."""
         parameter_timelines = self.parameter_timelines
         section_states = defaultdict(dict)
 
@@ -461,8 +489,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return Dict(section_states)
 
     @cached_property_if_locked
-    def parameter_events(self):
-        """dict: Event parameters mapped to their corresponding events.
+    def parameter_events(self) -> dict[str, list[Event] | dict[int, list[Event]]]:
+        """
+        Return event parameters mapped to their corresponding events.
 
         This dictionary associates each event parameter with its list of events.
         For events that are index-specific, an inner dictionary is used, where
@@ -487,8 +516,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return Dict(parameter_events)
 
     @cached_property_if_locked
-    def parameter_timelines(self):
-        """dict: TimeLine representation for every event parameter.
+    def parameter_timelines(self) -> Dict[str, TimeLine]:
+        """
+        Return Dict: TimeLine representation for every event parameter.
 
         This dictionary associates each event parameter with its TimeLine object.
         If an event parameter is considered as one of the 'sized parameters',
@@ -522,25 +552,34 @@ class EventHandler(CachedPropertiesMixin, Structure):
                     if i_evt < len(index_events) - 1:
                         section_end = index_events[i_evt + 1].time
                         self._create_and_add_sections(
-                            section_start, section_end,
-                            evt, index,
-                            parameter_timelines, multi_timelines
+                            section_start,
+                            section_end,
+                            evt,
+                            index,
+                            parameter_timelines,
+                            multi_timelines,
                         )
                     else:
                         section_end = self.cycle_time
                         self._create_and_add_sections(
-                            section_start, section_end,
-                            evt, index,
-                            parameter_timelines, multi_timelines
+                            section_start,
+                            section_end,
+                            evt,
+                            index,
+                            parameter_timelines,
+                            multi_timelines,
                         )
 
                         if index_events[0].time != 0:
                             section_start = 0.0
                             section_end = index_events[0].time
                             self._create_and_add_sections(
-                                section_start, section_end,
-                                evt, index,
-                                parameter_timelines, multi_timelines
+                                section_start,
+                                section_end,
+                                evt,
+                                index,
+                                parameter_timelines,
+                                multi_timelines,
                             )
 
         for param, tl in multi_timelines.items():
@@ -549,14 +588,14 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return Dict(parameter_timelines)
 
     def _create_and_add_sections(
-            self,
-            start,
-            end,
-            evt,
-            index,
-            parameter_timelines,
-            multi_timelines
-            ):
+        self,
+        start: float,
+        end: float,
+        evt: Event,
+        index: int | tuple[int],
+        parameter_timelines: dict,
+        multi_timelines: dict,
+    ) -> None:
         """
         Create a new Section and integrate it into the correct TimeLine.
 
@@ -588,12 +627,13 @@ class EventHandler(CachedPropertiesMixin, Structure):
                 start, end, evt.index_states[index], is_polynomial=evt.is_polynomial
             )
             if evt.degree > 0 and len(index) == 1:
-                index = (0, ) + index
+                index = (0,) + index
             multi_timelines[evt.parameter_path].add_section(section, index)
 
     @property
-    def performer_events(self):
-        """dict: Event performer mapped to their corresponding list of events.
+    def performer_events(self) -> Dict[str, list[Event]]:
+        """
+        Return Dict: Event performer mapped to their corresponding list of events.
 
         For every event, this dictionary associates the event's performer
         with the event. This allows for easy retrieval of all events carried out
@@ -606,26 +646,26 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return Dict(performer_events)
 
     @cached_property_if_locked
-    def performer_timelines(self):
-        """dict: Each performer mapped to their TimeLines based on event parameters.
+    def performer_timelines(self) -> Dict[str, dict[str, TimeLine]]:
+        """
+        Return Dict: Each performer mapped to their TimeLines based on event parameters.
 
         This dictionary provides a representation of event parameters in the form
         of timelines for each performer. This hierarchical structure helps in
         quickly accessing the TimeLine of any event parameter specific to a performer.
         """
-        performer_timelines = {
-            performer: {} for performer in self.event_performers
-        }
+        performer_timelines = {performer: {} for performer in self.event_performers}
 
         for param, tl in self.parameter_timelines.items():
-            performer, param = param.rsplit('.', 1)
+            performer, param = param.rsplit(".", 1)
             performer_timelines[performer][param] = tl
 
         return performer_timelines
 
     @property
-    def parameters(self):
-        """dict: The EventHandler parameters.
+    def parameters(self) -> dict:
+        """
+        dict: The EventHandler parameters.
 
         In addition to the standard parameters retrieved from the superclass,
         this property adds event parameters from independent events, parameters
@@ -642,15 +682,15 @@ class EventHandler(CachedPropertiesMixin, Structure):
         durations = {dur.name: dur.parameters for dur in self.durations}
         parameters.update(durations)
 
-        parameters['cycle_time'] = self.cycle_time
+        parameters["cycle_time"] = self.cycle_time
 
         return parameters
 
     @parameters.setter
-    def parameters(self, parameters):
+    def parameters(self, parameters: dict) -> None:
         """Set event parameters based on provided dictionary."""
         try:
-            self.cycle_time = parameters.pop('cycle_time')
+            self.cycle_time = parameters.pop("cycle_time")
         except KeyError:
             pass
 
@@ -658,8 +698,11 @@ class EventHandler(CachedPropertiesMixin, Structure):
             try:
                 evt = self.events_dict[evt_name]
             except AttributeError:
-                raise CADETProcessError('Not a valid event')
-            if "time" in evt_parameters and evt not in self.independent_events + self.durations:
+                raise CADETProcessError("Not a valid event")
+            if (
+                "time" in evt_parameters
+                and evt not in self.independent_events + self.durations
+            ):
                 raise CADETProcessError(
                     f'Cannot set "time" for {str(evt)} because it is not an independent event.'
                 )
@@ -667,8 +710,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
             evt.parameters = evt_parameters
 
     @property
-    def sized_parameters(self):
-        """dict: Compilation of parameters from events with indices.
+    def sized_parameters(self) -> dict:
+        """
+        dict: Compilation of parameters from events with indices.
 
         Besides the sized parameters fetched from the superclass, this property
         collects parameters from events that have associated indices.
@@ -684,7 +728,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
 
         return parameters
 
-    def check_config(self):
+    def check_config(self) -> bool:
         """
         Validate the event configuration.
 
@@ -706,7 +750,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
 
         return flag
 
-    def check_duplicate_events(self):
+    def check_duplicate_events(self) -> bool:
         """
         Ensure no simulateneous events are scheduled for a specific parameter and index.
 
@@ -732,7 +776,8 @@ class EventHandler(CachedPropertiesMixin, Structure):
                 index_event_times = [evt.time for evt in index_events]
 
                 duplicates = [
-                    time for time in set(index_event_times)
+                    time
+                    for time in set(index_event_times)
                     if index_event_times.count(time) > 1
                 ]
 
@@ -747,7 +792,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
 
         return flag
 
-    def check_uninitialized_indices(self):
+    def check_uninitialized_indices(self) -> bool:
         """
         Ensure all indices are specified when a parameter isn't initialized.
 
@@ -762,9 +807,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
         """
         flag = True
         for evt_parameter, events in self.parameter_events.items():
-            current_value = get_nested_value(
-                self.parameters, evt_parameter
-            )
+            current_value = get_nested_value(self.parameters, evt_parameter)
             current_value = np.array(current_value)
 
             if np.any(np.isnan(current_value)):
@@ -814,7 +857,7 @@ class EventHandler(CachedPropertiesMixin, Structure):
             layout.x_label = "$time~/~s$"
             if x_axis_in_minutes:
                 layout.x_label = "$time~/~min$"
-            layout.y_label = '$state$'
+            layout.y_label = "$state$"
 
             ax.plot(time_ax, y)
 
@@ -825,8 +868,9 @@ class EventHandler(CachedPropertiesMixin, Structure):
         return axs
 
 
-class Event():
-    """Defines dynamic changes of model parameters based on events.
+class Event:
+    """
+    Defines dynamic changes of model parameters based on events.
 
     An `Event` is a time-based modification to an attribute of a performer.
     Its execution time can depend on other Events or Durations. To handle
@@ -851,21 +895,21 @@ class Event():
     --------
     EventHandler
     Duration
-
     """
 
-    _parameters = ['time', 'state']
+    _parameters = ["time", "state"]
 
     def __init__(
-            self,
-            name,
-            event_handler,
-            parameter_path,
-            state,
-            time=0.0,
-            indices=None,
-            ):
-        """Initialize the Event object.
+        self,
+        name: str,
+        event_handler: EventHandler,
+        parameter_path: str,
+        state: float,
+        time: float = 0.0,
+        indices: Optional[int | list[int]] = None,
+    ) -> None:
+        """
+        Initialize the Event object.
 
         Parameters
         ----------
@@ -898,25 +942,26 @@ class Event():
         self.time = time
 
     @property
-    def parameter_path(self):
+    def parameter_path(self) -> str:
         """str: Dot notation path to the target parameter within the evaluation_object."""
         return self._parameter_path
 
     @parameter_path.setter
-    def parameter_path(self, parameter_path):
+    def parameter_path(self, parameter_path: str) -> None:
         if not check_nested(
             self.event_handler.section_dependent_parameters, parameter_path
         ):
-            raise CADETProcessError('Not a valid event parameter')
+            raise CADETProcessError("Not a valid event parameter")
         self._parameter_path = parameter_path
 
     @property
-    def parameter_sequence(self):
+    def parameter_sequence(self) -> tuple[str, ...]:
         """tuple: Tuple of parameters path elements."""
-        return tuple(self.parameter_path.split('.'))
+        return tuple(self.parameter_path.split("."))
 
     @property
-    def parameter_descriptor(self):
+    def parameter_descriptor(self) -> Optional[ParameterBase]:
+        """Return parameter descriptor."""
         performer_class = type(self.performer_obj)
         try:
             descriptor = getattr(performer_class, self.parameter_sequence[-1])
@@ -929,42 +974,42 @@ class Event():
         return descriptor
 
     @property
-    def parameter_type(self):
+    def parameter_type(self) -> Type[Any]:
         """type: Type of the parameter."""
         if isinstance(self.parameter_descriptor, Typed):
             return self.parameter_descriptor.ty
 
         if self.current_value is None:
             raise CADETProcessError(
-                "Parameter is not initialized. "
-                "Cannot determine parameter type."
+                "Parameter is not initialized. Cannot determine parameter type."
             )
 
         return type(self.current_value)
 
     @property
-    def parameter_shape(self):
+    def parameter_shape(self) -> tuple[int, ...]:
         """tuple: Shape of the parameter array."""
-        if isinstance(self.parameter_descriptor, (Float, Integer, Bool)):
+        param_descriptor = self.parameter_descriptor
+        if isinstance(param_descriptor, (Float, Integer, Bool)):
             return ()
 
-        if isinstance(self.parameter_descriptor, Sized):
-            shape = self.parameter_descriptor.get_expected_size(self.performer_obj)
+        if isinstance(param_descriptor, Sized):
+            shape = param_descriptor.get_expected_size(self.performer_obj)
             if not isinstance(shape, tuple):
-                shape = (shape, )
+                shape = (shape,)
 
             return shape
 
-        if self.current_value is None:
+        cur_value = self.current_value
+        if cur_value is None:
             raise CADETProcessError(
-                "Parameter is not initialized. "
-                "Cannot determine parameter shape."
+                "Parameter is not initialized. Cannot determine parameter shape."
             )
 
-        return np.array(self.current_value).shape
+        return np.array(cur_value).shape
 
     @property
-    def is_sized(self):
+    def is_sized(self) -> bool:
         """bool: True if descriptor is instance of Sized. False otherwise."""
         if isinstance(self.parameter_descriptor, (Float, Integer, Bool)):
             return False
@@ -980,12 +1025,14 @@ class Event():
         return np.array(self.current_value).size > 1
 
     @property
-    def is_polynomial(self):
+    def is_polynomial(self) -> bool:
         """bool: True if descriptor is instance of NdPolynomial. False otherwise."""
-        return check_nested(self.event_handler.polynomial_parameters, self.parameter_path)
+        return check_nested(
+            self.event_handler.polynomial_parameters, self.parameter_path
+        )
 
     @property
-    def degree(self):
+    def degree(self) -> int:
         """int: The degree of the polynomial event state."""
         if self.is_polynomial:
             shape = self.parameter_shape
@@ -994,18 +1041,21 @@ class Event():
             return 0
 
     @property
-    def indices(self):
-        """list: Indices for events that modifies only specific entries of a parameter.
+    def indices(self) -> list[tuple[int]] | None:
+        """
+        list: Indices for events that modifies only specific entries of a parameter.
 
         List of tuples for each entry. If parameter is scalar, None
         """
-        if len(self.parameter_shape) == 0:
+        param_shape = self.parameter_shape
+
+        if len(param_shape) == 0:
             return
 
-        indices = generate_indices(self.parameter_shape, self._indices)
+        indices = generate_indices(param_shape, self._indices)
 
         # Check if all indices unique:
-        full_indices = unravel(self.parameter_shape, indices)
+        full_indices = unravel(param_shape, indices)
         duplicates = [
             index for index in set(full_indices) if full_indices.count(index) > 1
         ]
@@ -1016,8 +1066,9 @@ class Event():
         return indices
 
     @indices.setter
-    def indices(self, indices):
-        """list: Indices of parameters to set Event state.
+    def indices(self, indices: list[int]) -> None:
+        """
+        list: Indices of parameters to set Event state.
 
         Can be list of tuples. Including slicing.
         """
@@ -1033,7 +1084,7 @@ class Event():
             raise e
 
     @property
-    def is_index_specific(self):
+    def is_index_specific(self) -> bool:
         """bool: True if event modifies entry of a parameter array, False otherwise."""
         if len(self.full_indices) > 0:
             return True
@@ -1041,7 +1092,7 @@ class Event():
             return False
 
     @property
-    def full_indices(self):
+    def full_indices(self) -> list[int]:
         """list: Full indices."""
         indices = self.indices
         if self.indices is None and len(self.parameter_shape) > 0:
@@ -1049,7 +1100,7 @@ class Event():
         return unravel(self.parameter_shape, indices)
 
     @property
-    def n_indices(self):
+    def n_indices(self) -> int:
         """int: Number of (full) indices."""
         if len(self.parameter_shape) > 0:
             return len(self.full_indices)
@@ -1057,7 +1108,7 @@ class Event():
             return 0
 
     @property
-    def n_entries(self):
+    def n_entries(self) -> int:
         """int: The number of entries in the event state."""
         if self.is_polynomial:
             return np.array(self.full_state).shape[0]
@@ -1067,8 +1118,14 @@ class Event():
             else:
                 return self.n_indices
 
-    def add_dependency(self, dependency, factor=1, transform=None):
-        """Add a time dependency on another event.
+    def add_dependency(
+        self,
+        dependency: Event,
+        factor: float = 1,
+        transform: Optional[Callable] = None,
+    ) -> None:
+        """
+        Add a time dependency on another event.
 
         When an event is dependent, the time of the event is based on a linear
         combination of its dependencies.
@@ -1093,12 +1150,15 @@ class Event():
         self._dependencies.append(dependency)
         self._factors.append(factor)
         if transform is None:
-            def transform(t):
+
+            def transform(t: Any) -> Any:
                 return t
+
         self._transforms.append(transform)
 
-    def remove_dependency(self, dependency):
-        """Remove dependencies of events.
+    def remove_dependency(self, dependency: Event) -> None:
+        """
+        Remove dependencies of events.
 
         Parameters
         ----------
@@ -1109,7 +1169,6 @@ class Event():
         ------
         CADETProcessError
             If the dependency doesn't exists in list dependencies.
-
         """
         if dependency in self._dependencies:
             raise CADETProcessError("Dependency not found")
@@ -1121,12 +1180,12 @@ class Event():
         del self._transforms[index]
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> list[Event]:
         """list: Events on which the Event depends."""
         return self._dependencies
 
     @property
-    def is_independent(self):
+    def is_independent(self) -> bool:
         """bool: True, if event is independent, False otherwise."""
         if len(self.dependencies) == 0:
             return True
@@ -1134,18 +1193,19 @@ class Event():
             return False
 
     @property
-    def factors(self):
+    def factors(self) -> list[int]:
         """list: Linear coefficients for dependent events."""
         return self._factors
 
     @property
-    def transforms(self):
+    def transforms(self) -> list[Callable]:
         """list: Transform functions for dependent events."""
         return self._transforms
 
     @property
-    def time(self):
-        """float: Time when the event is executed.
+    def time(self) -> float:
+        """
+        float: Time when the event is executed.
 
         If the value is larger than the cycle time, the time modulo cycle time
         is returned. If the Event is not independent, the time is calculated
@@ -1161,15 +1221,14 @@ class Event():
             time = self._time
         else:
             transformed_time = [
-                f(dep.time)
-                for f, dep in zip(self.transforms, self.dependencies)
+                f(dep.time) for f, dep in zip(self.transforms, self.dependencies)
             ]
             time = np.dot(transformed_time, self._factors)
-        cycle_time = getattr(self.event_handler, 'cycle_time')
+        cycle_time = getattr(self.event_handler, "cycle_time")
         return time % cycle_time
 
     @time.setter
-    def time(self, time):
+    def time(self, time: float) -> None:
         if not np.isscalar(time):
             raise TypeError("Expected scalar value")
 
@@ -1179,17 +1238,24 @@ class Event():
             raise CADETProcessError("Cannot set time for dependent events")
 
     @property
-    def state(self):
-        """Union[float, np.array]: Gets or sets the state of the parameter event.
+    def state(self) -> float | np.ndarray:
+        """
+        Return the state of the parameter event.
 
         When retrieving, it returns the current state of the event.
         When setting, the internal state is updated.
+
+        Returns
+        -------
+        float | np.ndarray
+            The state of the parameter event.
         """
         return self._state
 
     @state.setter
-    def state(self, state):
-        """Set the state of the event.
+    def state(self, state: float | np.ndarray) -> None:
+        """
+        Set the state of the event.
 
         If indices are not defined and there's no current value, it initializes
         the state with the provided value. The state is then updated with the
@@ -1197,7 +1263,7 @@ class Event():
 
         Parameters
         ----------
-        state : Union[float, np.array]
+        state : float or np.ndarray
             Value to set as the new state of the event.
 
         Raises
@@ -1218,40 +1284,40 @@ class Event():
         except (ValueError, TypeError) as e:
             raise e
 
-    def _ensure_2D_for_slices(self, state):
-        """Ensure the state is 2D when dealing with slices.
+    def _ensure_2D_for_slices(self, state: float | np.ndarray) -> None:
+        """
+        Ensure the state is 2D when dealing with slices.
 
         If there's only one set of indices and it contains a slice, it
         prepares the state to be handled as a 2D structure.
 
         Parameters
         ----------
-        state : Union[float, np.array]
+        state : float or np.ndarray
             The state that might need to be converted.
 
         Returns
         -------
-        Union[float, np.array]
+        float or np.ndarray
             Original state or a 2D structure depending on the indices.
         """
-        if (
-            len(self.indices) == 1
-            and
-            any(isinstance(i, slice) for i in self.indices[0])
+        if len(self.indices) == 1 and any(
+            isinstance(i, slice) for i in self.indices[0]
         ):
             state = [state]
 
         return state
 
     @property
-    def full_state(self):
-        """Construct the full state based on indices and current value.
+    def full_state(self) -> float | list:
+        """
+        Construct the full state based on indices and current value.
 
         This method reconstructs the state from the stored state value,.
 
         Returns
         -------
-        Union[float, list]
+        float or list
             The computed full state, either as a scalar or an array.
 
         Raises
@@ -1260,6 +1326,7 @@ class Event():
             If the length of the state does not match the length of the indices.
         """
         state = self._state
+        indices = self.indices
 
         # Get new (full) parameter value
         if self._indices is None:
@@ -1277,14 +1344,18 @@ class Event():
             # Ensure state is 2D for indices that contain slices
             state = self._ensure_2D_for_slices(state)
 
-            if len(state) != len(self.indices):
+            if len(state) != len(indices):
                 raise ValueError(
                     f"Expected {len(self.indices)} entries for state. Got {len(state)}"
                 )
 
-            for i, ind in enumerate(self.indices):
+            for i, ind in enumerate(indices):
                 expected_shape = new_value[ind].shape
-                if self.is_polynomial and len(self.parameter_shape) > 1 and len(ind) == 1:
+                if (
+                    self.is_polynomial
+                    and len(self.parameter_shape) > 1
+                    and len(ind) == 1
+                ):
                     new_slice = self.parameter_descriptor.fill_values(
                         expected_shape, state[i]
                     )
@@ -1308,10 +1379,10 @@ class Event():
         self.set_value(new_value)
         new_value = self.current_value
 
-        if self.indices is not None:
+        if indices is not None:
             new_value = np.array(new_value, ndmin=1)
             full_state = []
-            for ind in self.indices:
+            for ind in indices:
                 full_state += new_value[ind].flatten().tolist()
         else:
             full_state = new_value
@@ -1319,7 +1390,7 @@ class Event():
         return full_state
 
     @property
-    def index_states(self):
+    def index_states(self) -> dict[tuple, float]:
         """dict[tuple, float]: State values mapped to their respective indices."""
         index_states = {}
         for ind, state in zip(self.full_indices, self.full_state):
@@ -1328,7 +1399,7 @@ class Event():
         return index_states
 
     @property
-    def performer(self):
+    def performer(self) -> str:
         """str: The name of the performer of the event."""
         if len(self.parameter_sequence) == 1:
             return self.parameter_sequence[0]
@@ -1336,11 +1407,11 @@ class Event():
             return ".".join(self.parameter_sequence[:-1])
 
     @property
-    def performer_obj(self):
+    def performer_obj(self) -> Any:
         """any: Performer object from the event handler."""
         return get_nested_attribute(self.event_handler, self.performer)
 
-    def set_value(self, state):
+    def set_value(self, state: float | np.ndarray) -> None:
         """Set the specified state to the associated event parameter."""
         state = copy.deepcopy(state)
         if self.parameter_descriptor is not None:
@@ -1350,48 +1421,48 @@ class Event():
             self.event_handler.parameters = parameters
 
     @property
-    def current_value(self):
+    def current_value(self) -> Any:
         """any: Current state of the associated event parameter."""
         if self.parameter_descriptor is not None:
             return getattr(self.performer_obj, self.parameter_sequence[-1])
         else:
-            return get_nested_value(
-                self.event_handler.parameters, self.parameter_path
-            )
+            return get_nested_value(self.event_handler.parameters, self.parameter_path)
 
     @property
-    def parameters(self):
+    def parameters(self) -> dict:
         """dict: list with all parameters."""
-        return Dict({
-            param: getattr(self, param) for param in self._parameters
-        })
+        return Dict({param: getattr(self, param) for param in self._parameters})
 
     @parameters.setter
-    def parameters(self, parameters):
+    def parameters(self, parameters: float | int | dict) -> None:
         if isinstance(parameters, (float, int)):
             self.time = parameters
         else:
             for param, value in parameters.items():
                 if param not in self._parameters:
-                    raise CADETProcessError('Not a valid parameter')
+                    raise CADETProcessError("Not a valid parameter")
                 setattr(self, param, value)
 
-    def __repr__(self):
-        representation = \
-            f'{self.__class__.__name__}('\
-            f'name={self.name}, '\
-            f'parameter_path={self.parameter_path}, '\
-            f'state={self.state}, '\
-            f'time={self.time}'
+    def __repr__(self) -> str:
+        """str: String representation of the Event."""
+        representation = (
+            f"{self.__class__.__name__}("
+            f"name={self.name}, "
+            f"parameter_path={self.parameter_path}, "
+            f"state={self.state}, "
+            f"time={self.time}"
+        )
         if self.indices is not None:
-            representation += f', indices={self.indices}'
+            representation += f", indices={self.indices}"
 
-        representation += ')'
+        representation += ")"
 
         return representation
 
-class Duration():
-    """Class for representing a duration between two events in an Eventhandler.
+
+class Duration:
+    """
+    Class for representing a duration between two events in an Eventhandler.
 
     Attributes
     ----------
@@ -1399,30 +1470,34 @@ class Duration():
         Name of the start event of a duration.
     end_event : str
         Name of the end event of a duration.
-
     """
 
-    def __init__(self, name, event_handler, time=0.0):
+    def __init__(
+        self,
+        name: str,
+        event_handler: EventHandler,
+        time: float = 0.0,
+    ) -> None:
+        """Initialize Duration Object."""
         self.name = name
         self.time = time
-        self._parameters = ['time']
+        self._parameters = ["time"]
 
     @property
-    def parameters(self):
+    def parameters(self) -> Dict:
         """dict: list with all parameters."""
-        return Dict({
-            param: getattr(self, param) for param in self._parameters
-        })
+        return Dict({param: getattr(self, param) for param in self._parameters})
 
     @parameters.setter
-    def parameters(self, parameters):
+    def parameters(self, parameters: float | int | dict) -> None:
         if isinstance(parameters, (float, int)):
             self.time = parameters
         else:
             for param, value in parameters.items():
                 if param not in self._parameters:
-                    raise CADETProcessError('Not a valid parameter')
+                    raise CADETProcessError("Not a valid parameter")
                 setattr(self, param, value)
 
-    def __repr__(self):
-        return f'{self.__class__.__name__}(name={self.name}, time={self.time})'
+    def __repr__(self) -> str:
+        """str: String representation of the Duration."""
+        return f"{self.__class__.__name__}(name={self.name}, time={self.time})"

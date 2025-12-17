@@ -1,16 +1,17 @@
-from collections import defaultdict
-from pathlib import Path
 import shutil
 import tempfile
+from collections import defaultdict
+from pathlib import Path
+from typing import Any, Optional
 
 from diskcache import Cache, FanoutCache
 
-from CADETProcess import CADETProcessError
 from CADETProcess.dataStructure import DillDisk
 
 
-class ResultsCache():
-    """Cache to store (intermediate) results.
+class ResultsCache:
+    """
+    Cache to store (intermediate) results.
 
     Optinally uses diskcache library to store large objects in sqlite database.
 
@@ -39,7 +40,13 @@ class ResultsCache():
     CADETProcess.optimization.OptimizationProblem.add_evaluator
     """
 
-    def __init__(self, use_diskcache=False, directory=None, n_shards=1):
+    def __init__(
+        self,
+        use_diskcache: bool = False,
+        directory: Optional[str] = None,
+        n_shards: int = 1,
+    ) -> None:
+        """Initialize ResultsCache Object."""
         self.use_diskcache = use_diskcache
         self.directory = directory
         self.n_shards = n_shards
@@ -47,11 +54,11 @@ class ResultsCache():
 
         self.tags = defaultdict(list)
 
-    def init_cache(self):
+    def init_cache(self) -> None:
         """Initialize ResultsCache."""
         if self.use_diskcache:
             if self.directory is None:
-                self.directory = Path(tempfile.mkdtemp(prefix='diskcache-'))
+                self.directory = Path(tempfile.mkdtemp(prefix="diskcache-"))
 
             if self.directory.exists():
                 shutil.rmtree(self.directory, ignore_errors=True)
@@ -60,27 +67,34 @@ class ResultsCache():
 
             if self.n_shards == 1:
                 self.cache = Cache(
-                   self.directory.as_posix(),
-                   disk=DillDisk,
-                   disk_min_file_size=2**18,    # 256 kb
-                   size_limit=2**36,            # 64 GB
-                   tag_index=True,
+                    self.directory.as_posix(),
+                    disk=DillDisk,
+                    disk_min_file_size=2**18,  # 256 kb
+                    size_limit=2**36,  # 64 GB
+                    tag_index=True,
                 )
             else:
                 self.cache = FanoutCache(
-                   self.directory.as_posix(),
-                   shards=self.n_shards,
-                   disk=DillDisk,
-                   disk_min_file_size=2**18,    # 256 kb
-                   size_limit=2**36,            # 64 GB
-                   tag_index=True,
+                    self.directory.as_posix(),
+                    shards=self.n_shards,
+                    disk=DillDisk,
+                    disk_min_file_size=2**18,  # 256 kb
+                    size_limit=2**36,  # 64 GB
+                    tag_index=True,
                 )
             self.directory = self.cache.directory
         else:
             self.cache = {}
 
-    def set(self, key, value, tag=None, close=True):
-        """Add entry to cache.
+    def set(
+        self,
+        key: Any,
+        value: Any,
+        tag: Optional[str] = None,
+        close: bool = True,
+    ) -> None:
+        """
+        Add entry to cache.
 
         Parameters
         ----------
@@ -103,7 +117,7 @@ class ResultsCache():
         if close:
             self.close()
 
-    def get(self, key, close=True):
+    def get(self, key: Any, close: bool = True) -> Any:
         """
         Get entry from cache.
 
@@ -126,7 +140,7 @@ class ResultsCache():
 
         return value
 
-    def delete(self, key, close=True):
+    def delete(self, key: Any, close: Optional[bool] = True) -> None:
         """
         Remove entry from cache.
 
@@ -147,7 +161,7 @@ class ResultsCache():
         if close:
             self.close()
 
-    def prune(self, tag, close=True):
+    def prune(self, tag: str, close: Optional[bool] = True) -> None:
         """
         Remove tagged entries from cache.
 
@@ -172,13 +186,14 @@ class ResultsCache():
         if close:
             self.close()
 
-    def close(self):
+    def close(self) -> None:
         """Close cache."""
         if self.use_diskcache:
             self.cache.close()
 
-    def delete_database(self, reinit=False):
-        """Delte database.
+    def delete_database(self, reinit: Optional[bool] = False) -> None:
+        """
+        Delte database.
 
         Parameters
         ----------

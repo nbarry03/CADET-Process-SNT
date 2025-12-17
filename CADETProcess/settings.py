@@ -12,22 +12,22 @@ This module provides functionality for general settings.
 
     Settings
 
-"""
+"""  # noqa
 
-from pathlib import Path
+import os
 import shutil
 import tempfile
+from pathlib import Path
 from warnings import warn
 
-from CADETProcess.dataStructure import Structure
-from CADETProcess.dataStructure import Bool, Switch
+from CADETProcess.dataStructure import Bool, Structure, Switch
 
-
-__all__ = ['Settings']
+__all__ = ["Settings"]
 
 
 class Settings(Structure):
-    """A class for managing general settings.
+    """
+    A class for managing general settings.
 
     Attributes
     ----------
@@ -53,17 +53,19 @@ class Settings(Structure):
     _save_log = Bool(default=False)
     debug_mode = Bool(default=False)
     LOG_LEVEL = Switch(
-        valid=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        default='INFO'
+        valid=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
     )
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize Settings Object."""
         self._temp_dir = None
         self.working_directory = None
 
     @property
-    def working_directory(self):
-        """The path of the working directory.
+    def working_directory(self) -> str:
+        """
+        The path of the working directory.
 
         If the working directory is not set, the current directory is used.
 
@@ -78,7 +80,7 @@ class Settings(Structure):
             The absolute path of the working directory.
         """
         if self._working_directory is None:
-            _working_directory = Path('./')
+            _working_directory = Path("./")
         else:
             _working_directory = Path(self._working_directory)
 
@@ -89,38 +91,44 @@ class Settings(Structure):
         return _working_directory
 
     @working_directory.setter
-    def working_directory(self, working_directory):
+    def working_directory(self, working_directory: str) -> None:
         self._working_directory = working_directory
 
-    def set_working_directory(self, working_directory):
+    def set_working_directory(self, working_directory: str) -> None:
+        """Set working directory."""
         warn(
-            'This function is deprecated, use working_directory property.',
-            DeprecationWarning, stacklevel=2
+            "This function is deprecated, use working_directory property.",
+            DeprecationWarning,
+            stacklevel=2,
         )
         self.working_directory = working_directory
 
     @property
-    def save_log(self):
+    def save_log(self) -> bool:
         """bool: If True, save log files."""
         return self._save_log
 
     @save_log.setter
-    def save_log(self, save_log):
+    def save_log(self, save_log: bool) -> None:
         from CADETProcess import log
+
         log.update_loggers(self.log_directory, save_log)
 
         self._save_log = save_log
 
     @property
-    def log_directory(self):
+    def log_directory(self) -> str:
         """pathlib.Path: Log directory."""
-        return self.working_directory / 'log'
+        return self.working_directory / "log"
 
     @property
-    def temp_dir(self):
+    def temp_dir(self) -> str:
         """pathlib.Path: Directory for temporary files."""
         if self._temp_dir is None:
-            _temp_dir = self.working_directory / 'tmp'
+            if "XDG_RUNTIME_DIR" in os.environ:
+                _temp_dir = Path(os.environ["XDG_RUNTIME_DIR"]) / "CADET-Process"
+            else:
+                _temp_dir = self.working_directory / "tmp"
         else:
             _temp_dir = Path(self._temp_dir).absolute()
 
@@ -130,10 +138,10 @@ class Settings(Structure):
         return Path(tempfile.gettempdir())
 
     @temp_dir.setter
-    def temp_dir(self, temp_dir):
+    def temp_dir(self, temp_dir: str) -> None:
         self._temp_dir = temp_dir
 
-    def delete_temporary_files(self):
+    def delete_temporary_files(self) -> None:
         """Delete the temporary files directory."""
         shutil.rmtree(self.temp_dir / "simulation_files", ignore_errors=True)
         self.temp_dir = self._temp_dir

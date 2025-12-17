@@ -13,27 +13,33 @@ This module provides a class for storing simulation results.
 
     SimulationResults
 
-"""
+"""  # noqa
+
+from __future__ import annotations
 
 import copy
-import os
 
 import numpy as np
 from addict import Dict
 
 from CADETProcess import CADETProcessError
-from CADETProcess import settings
-from CADETProcess.dataStructure import Structure
 from CADETProcess.dataStructure import (
-    Dictionary, String, List, UnsignedInteger, UnsignedFloat
+    Dictionary,
+    List,
+    String,
+    Structure,
+    UnsignedFloat,
+    UnsignedInteger,
 )
+from CADETProcess.processModel import ComponentSystem, Process, UnitBaseClass
+from CADETProcess.solution import SolutionBase
 
-
-__all__ = ['SimulationResults']
+__all__ = ["SimulationResults"]
 
 
 class SimulationResults(Structure):
-    """Class for storing simulation results including the solver configuration.
+    """
+    Class for storing simulation results including the solver configuration.
 
     Attributes
     ----------
@@ -68,7 +74,6 @@ class SimulationResults(Structure):
     -----
         Ideally, the final state for each unit operation should be saved.
         However, CADET does currently provide this functionality.
-
     """
 
     solver_name = String()
@@ -82,13 +87,19 @@ class SimulationResults(Structure):
     chromatograms = List()
 
     def __init__(
-            self,
-            solver_name, solver_parameters,
-            exit_flag, exit_message, time_elapsed,
-            process,
-            solution_cycles, sensitivity_cycles, system_state,
-            chromatograms
-            ):
+        self,
+        solver_name: str,
+        solver_parameters: dict,
+        exit_flag: int,
+        exit_message: str,
+        time_elapsed: float,
+        process: Process,
+        solution_cycles: dict,
+        sensitivity_cycles: dict,
+        system_state: dict,
+        chromatograms: list,
+    ) -> None:
+        """Initialize SimulationResults."""
         self.solver_name = solver_name
         self.solver_parameters = solver_parameters
 
@@ -107,9 +118,10 @@ class SimulationResults(Structure):
         self._solution = None
         self._sensitivity = None
 
-    def update(self, new_results):
+    def update(self, new_results: SimulationResults) -> None:
+        """Update the simulation results with results from a new cycle."""
         if self.process.name != new_results.process.name:
-            raise CADETProcessError('Process does not match')
+            raise CADETProcessError("Process does not match")
 
         self.exit_flag = new_results.exit_flag
         self.exit_message = new_results.exit_message
@@ -128,12 +140,13 @@ class SimulationResults(Structure):
         self._sensitivity = None
 
     @property
-    def component_system(self):
+    def component_system(self) -> ComponentSystem:
+        """ComponentSystem: The component system used in the simulation."""
         solution = self.solution_cycles[self._first_unit][self._first_solution]
         return solution[0].component_system
 
     @property
-    def solution(self):
+    def solution(self) -> Dict:
         """Construct complete solution from individual cyles."""
         if self._solution is not None:
             return self._solution
@@ -142,52 +155,51 @@ class SimulationResults(Structure):
 
         solution = Dict()
         for unit, solutions in self.solution_cycles.items():
-
             for sol, ports_cycles in solutions.items():
                 if isinstance(ports_cycles, Dict):
                     ports = ports_cycles
                     for port, cycles in ports.items():
                         solution[unit][sol][port] = copy.deepcopy(cycles[0])
-                        solution_complete = cycles[0].solution_original
+                        solution_complete = cycles[0].solution
                         if solution_complete.ndim > 1:
                             for i in range(1, self.n_cycles):
                                 solution_complete = np.vstack((
-                                    solution_complete, cycles[i].solution_original[1:]
+                                    solution_complete, cycles[i].solution[1:]
                                 ))
                         else:
                             for i in range(1, self.n_cycles):
                                 solution_complete = np.hstack((
-                                    solution_complete, cycles[i].solution_original[1:]
+                                    solution_complete, cycles[i].solution[1:]
                                 ))
 
-                        solution[unit][sol][port].time_original = time_complete
-                        solution[unit][sol][port].solution_original = solution_complete
-                        solution[unit][sol][port].reset()
+                        solution[unit][sol][port].time = time_complete
+                        solution[unit][sol][port].solution = solution_complete
+                        solution[unit][sol][port].update_solution()
                 else:
                     cycles = ports_cycles
                     solution[unit][sol] = copy.deepcopy(cycles[0])
-                    solution_complete = cycles[0].solution_original
+                    solution_complete = cycles[0].solution
                     if solution_complete.ndim > 1:
                         for i in range(1, self.n_cycles):
                             solution_complete = np.vstack((
-                                solution_complete, cycles[i].solution_original[1:]
+                                solution_complete, cycles[i].solution[1:]
                             ))
                     else:
                         for i in range(1, self.n_cycles):
                             solution_complete = np.hstack((
-                                solution_complete, cycles[i].solution_original[1:]
+                                solution_complete, cycles[i].solution[1:]
                             ))
 
-                    solution[unit][sol].time_original = time_complete
-                    solution[unit][sol].solution_original = solution_complete
-                    solution[unit][sol].reset()
+                    solution[unit][sol].time = time_complete
+                    solution[unit][sol].solution = solution_complete
+                    solution[unit][sol].update_solution()
 
         self._solution = solution
 
         return solution
 
     @property
-    def sensitivity(self):
+    def sensitivity(self) -> Dict:
         """Construct complete sensitivity from individual cyles."""
         if self._sensitivity is not None:
             return self._sensitivity
@@ -196,100 +208,69 @@ class SimulationResults(Structure):
 
         sensitivity = Dict()
         for sens_name, sensitivities in self.sensitivity_cycles.items():
-
             for unit, sensitivities in sensitivities.items():
-
                 for flow, ports_cycles in sensitivities.items():
                     if isinstance(ports_cycles, Dict):
                         ports = ports_cycles
                         for port, cycles in ports.items():
                             sensitivity[sens_name][unit][flow][port] = copy.deepcopy(
-                                cycles[0])
-                            sensitivity_complete = cycles[0].solution_original
+                                cycles[0]
+                            )
+                            sensitivity_complete = cycles[0].solution
                             for i in range(1, self.n_cycles):
                                 sensitivity_complete = np.vstack((
-                                    sensitivity_complete, cycles[i].solution_original[1:]
+                                    sensitivity_complete, cycles[i].solution[1:]
                                 ))
-                            sensitivity[sens_name][unit][flow][port].time_original = time_complete
-                            sensitivity[sens_name][unit][flow][port].solution_original = sensitivity_complete
-                            sensitivity[sens_name][unit][flow][port].reset()
+                            sensitivity[sens_name][unit][flow][port].time = time_complete
+                            sensitivity[sens_name][unit][flow][port].solution = sensitivity_complete
+                            sensitivity[sens_name][unit][flow][port].update_solution()
 
                     else:
                         cycles = ports_cycles
                         sensitivity[sens_name][unit][flow] = copy.deepcopy(cycles[0])
-                        sensitivity_complete = cycles[0].solution_original
+                        sensitivity_complete = cycles[0].solution
                         for i in range(1, self.n_cycles):
                             sensitivity_complete = np.vstack((
-                                sensitivity_complete, cycles[i].solution_original[1:]
+                                sensitivity_complete, cycles[i].solution[1:]
                             ))
-                        sensitivity[sens_name][unit][flow].time_original = time_complete
-                        sensitivity[sens_name][unit][flow].solution_original = sensitivity_complete
-                        sensitivity[sens_name][unit][flow].reset()
+                        sensitivity[sens_name][unit][flow].time = time_complete
+                        sensitivity[sens_name][unit][flow].solution = sensitivity_complete
+                        sensitivity[sens_name][unit][flow].update_solution()
 
         self._sensitivity = sensitivity
 
         return sensitivity
 
     @property
-    def n_cycles(self):
-        return len(
-            self.solution_cycles[self._first_unit][self._first_solution]
-        )
+    def n_cycles(self) -> int:
+        """int: Number of simulated cycles."""
+        return len(self.solution_cycles[self._first_unit][self._first_solution])
 
     @property
-    def _first_unit(self):
+    def _first_unit(self) -> UnitBaseClass:
         return next(iter(self.solution_cycles))
 
     @property
-    def _first_solution(self):
+    def _first_solution(self) -> SolutionBase:
         return next(iter(self.solution_cycles[self._first_unit]))
 
     @property
-    def time_cycle(self):
-        """np.array: Solution times vector"""
-        return self.solution_cycles[self._first_unit][self._first_solution][0].time_original
+    def time_cycle(self) -> np.ndarray:
+        """np.array: Solution times vector."""
+        return self.solution_cycles[self._first_unit][self._first_solution][0].time
 
     @property
-    def time_complete(self):
+    def time_complete(self) -> np.ndarray:
+        """np.ndarray: Solution times vector for all cycles."""
         if self._time_complete is not None:
             return self._time_complete
 
         time_complete = self.time_cycle
         for i in range(1, self.n_cycles):
             time_complete = np.hstack((
-                time_complete,
-                self.time_cycle[1:] + i*self.process.cycle_time
+                time_complete, self.time_cycle[1:] + i * self.process.cycle_time
             ))
 
         self._time_complete = time_complete
 
         return time_complete
-
-    def save(self, case_dir=None, unit=None, start=0, end=None):
-        path = settings.working_directory
-        if case_dir is not None:
-            path = os.path.join(settings.working_directory, case_dir)
-
-        if unit is None:
-            units = self.solution.keys()
-        else:
-            units = self.solution[unit]
-
-        for unit in units:
-            self.solution[unit][-1].plot(
-                save_path=path + '/' + unit + '_last.png',
-                start=start, end=end
-            )
-
-        for unit in units:
-            self.solution_complete[unit].plot(
-                save_path=path + '/' + unit + '_complete.png',
-                start=start, end=end
-            )
-
-        for unit in units:
-            self.solution[unit][-1].plot(
-                save_path=path + '/' + unit + '_overlay.png',
-                overlay=[cyc.signal for cyc in self.solution[unit][0:-1]],
-                start=start, end=end
-            )

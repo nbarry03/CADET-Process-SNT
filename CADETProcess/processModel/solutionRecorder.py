@@ -1,5 +1,4 @@
-from CADETProcess.dataStructure import Structure, Bool
-from CADETProcess.dataStructure import frozen_attributes
+from CADETProcess.dataStructure import Bool, Structure
 
 
 class BaseMixin(Structure):
@@ -18,8 +17,8 @@ class BaseMixin(Structure):
     write_coordinates = Bool(default=True)
 
     _parameters = [
-        'write_coordinates',
-        'write_solution_last_unit',
+        "write_coordinates",
+        "write_solution_last_unit",
     ]
 
 
@@ -47,7 +46,6 @@ class IOMixin(Structure):
     write_sensdot_outlet : bool, optional
         If True, write sensitivities derivatives of the unit operation outlet.
         The default is False.
-
     """
 
     write_solution_inlet = Bool(default=True)
@@ -61,15 +59,14 @@ class IOMixin(Structure):
     write_sensdot_outlet = Bool(default=False)
 
     _parameters = [
-        'write_solution_inlet',
-        'write_soldot_inlet',
-        'write_sens_inlet',
-        'write_sensdot_inlet',
-
-        'write_solution_outlet',
-        'write_soldot_outlet',
-        'write_sens_outlet',
-        'write_sensdot_outlet'
+        "write_solution_inlet",
+        "write_soldot_inlet",
+        "write_sens_inlet",
+        "write_sensdot_inlet",
+        "write_solution_outlet",
+        "write_soldot_outlet",
+        "write_sens_outlet",
+        "write_sensdot_outlet",
     ]
 
 
@@ -95,10 +92,10 @@ class BulkMixin(Structure):
     write_sensdot_bulk = Bool(default=False)
 
     _parameters = [
-        'write_solution_bulk',
-        'write_soldot_bulk',
-        'write_sens_bulk',
-        'write_sensdot_bulk',
+        "write_solution_bulk",
+        "write_soldot_bulk",
+        "write_sens_bulk",
+        "write_sensdot_bulk",
     ]
 
 
@@ -119,7 +116,6 @@ class ParticleMixin(Structure):
     write_sensdot_particle : bool, optional
         If True, write the sensitivities derivatives of the particle liquid phase.
         The default is False.
-
     """
 
     write_solution_particle = Bool(default=False)
@@ -128,10 +124,10 @@ class ParticleMixin(Structure):
     write_sensdot_particle = Bool(default=False)
 
     _parameters = [
-            'write_solution_particle',
-            'write_soldot_particle',
-            'write_sens_particle',
-            'write_sensdot_particle',
+        "write_solution_particle",
+        "write_soldot_particle",
+        "write_sens_particle",
+        "write_sensdot_particle",
     ]
 
 
@@ -151,7 +147,6 @@ class SolidMixin(Structure):
     write_sensdot_solid : bool, optional
         If True, write the sensitivities derivatives of the particle solid phase.
         The default is False.
-
     """
 
     write_solution_solid = Bool(default=False)
@@ -160,10 +155,10 @@ class SolidMixin(Structure):
     write_sensdot_solid = Bool(default=False)
 
     _parameters = [
-            'write_solution_solid',
-            'write_soldot_solid',
-            'write_sens_solid',
-            'write_sensdot_solid',
+        "write_solution_solid",
+        "write_soldot_solid",
+        "write_sens_solid",
+        "write_sensdot_solid",
     ]
 
 
@@ -181,7 +176,6 @@ class FluxMixin(Structure):
         If True, write the sensitivities of the flux. The default is False.
     write_sensdot_flux : bool, optional
         If True, write the sensitivities derivatives of the flux. The default is False.
-
     """
 
     write_solution_flux = Bool(default=False)
@@ -190,10 +184,10 @@ class FluxMixin(Structure):
     write_sens_flux = Bool(default=False)
 
     _parameters = [
-        'write_solution_flux',
-        'write_soldot_flux',
-        'write_sens_flux',
-        'write_sensdot_flux',
+        "write_solution_flux",
+        "write_soldot_flux",
+        "write_sens_flux",
+        "write_sensdot_flux",
     ]
 
 
@@ -212,7 +206,6 @@ class VolumeMixin(Structure):
     write_sensdot_volume : bool, optional
         If True, write the sensitivities derivatives of the unit volume.
         The default is False.
-
     """
 
     write_solution_volume = Bool(default=True)
@@ -221,24 +214,22 @@ class VolumeMixin(Structure):
     write_sensdot_volume = Bool(default=False)
 
     _parameters = [
-        'write_solution_volume',
-        'write_soldot_volume',
-        'write_sens_volume',
-        'write_sensdot_volume'
+        "write_solution_volume",
+        "write_soldot_volume",
+        "write_sens_volume",
+        "write_sensdot_volume",
     ]
 
 
-class SolutionRecorderBase():
+class SolutionRecorderBase:
     """Base class for solution recorders."""
 
     pass
 
 
-class IORecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin):
-    """Recorder for inlets and outlets.
+class IORecorder(SolutionRecorderBase, BaseMixin, IOMixin):
+    """
+    Recorder for inlets and outlets.
 
     See Also
     --------
@@ -246,18 +237,14 @@ class IORecorder(
     IOMixin
     CADETProcess.processModel.Inlet
     CADETProcess.processModel.Outlet
-
     """
 
     pass
 
 
-class TubularReactorRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin):
-    """Recorder for TubularReactor.
+class TubularReactorRecorder(SolutionRecorderBase, BaseMixin, IOMixin, BulkMixin):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -265,19 +252,14 @@ class TubularReactorRecorder(
     IOMixin
     SolutionRecorderBulk
     CADETProcess.processModel.TubularReactor
-
     """
 
     pass
 
 
-class LRMRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin,
-        SolidMixin):
-    """Recorder for TubularReactor.
+class LRMRecorder(SolutionRecorderBase, BaseMixin, IOMixin, BulkMixin, SolidMixin):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -286,21 +268,22 @@ class LRMRecorder(
     BulkMixin
     SolidMixin
     CADETProcess.processModel.LumpedRateModelWithoutPores
-
     """
 
     pass
 
 
 class LRMPRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin,
-        FluxMixin,
-        ParticleMixin,
-        SolidMixin):
-    """Recorder for TubularReactor.
+    SolutionRecorderBase,
+    BaseMixin,
+    IOMixin,
+    BulkMixin,
+    FluxMixin,
+    ParticleMixin,
+    SolidMixin,
+):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -311,21 +294,22 @@ class LRMPRecorder(
     ParticleMixin
     SolidMixin
     CADETProcess.processModel.LumpedRateModelWithPores
-
     """
 
     pass
 
 
 class GRMRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin,
-        FluxMixin,
-        ParticleMixin,
-        SolidMixin):
-    """Recorder for TubularReactor.
+    SolutionRecorderBase,
+    BaseMixin,
+    IOMixin,
+    BulkMixin,
+    FluxMixin,
+    ParticleMixin,
+    SolidMixin,
+):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -336,20 +320,16 @@ class GRMRecorder(
     ParticleMixin
     SolidMixin
     CADETProcess.processModel.GeneralRateModel
-
     """
 
     pass
 
 
 class CSTRRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin,
-        SolidMixin,
-        VolumeMixin):
-    """Recorder for TubularReactor.
+    SolutionRecorderBase, BaseMixin, IOMixin, BulkMixin, SolidMixin, VolumeMixin
+):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -359,18 +339,14 @@ class CSTRRecorder(
     SolidMixin
     VolumeMixin
     CADETProcess.processModel.Cstr
-
     """
 
     pass
 
 
-class MCTRecorder(
-        SolutionRecorderBase,
-        BaseMixin,
-        IOMixin,
-        BulkMixin):
-    """Recorder for TubularReactor.
+class MCTRecorder(SolutionRecorderBase, BaseMixin, IOMixin, BulkMixin):
+    """
+    Recorder for TubularReactor.
 
     See Also
     --------
@@ -378,7 +354,6 @@ class MCTRecorder(
     IOMixin
     BulkMixin
     CADETProcess.processModel.MCT
-
     """
 
     pass

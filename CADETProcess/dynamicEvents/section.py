@@ -1,22 +1,24 @@
+from __future__ import annotations
+
 import itertools
 import warnings
+from typing import Optional
 
 import numpy as np
-from numpy.exceptions import VisibleDeprecationWarning
+import numpy.typing as npt
 import scipy
 from matplotlib.axes import Axes
+from numpy.exceptions import VisibleDeprecationWarning
 
-from CADETProcess import CADETProcessError
-from CADETProcess.dataStructure import Structure
-from CADETProcess.dataStructure import NdPolynomial
-from CADETProcess import plotting
+from CADETProcess import CADETProcessError, plotting
+from CADETProcess.dataStructure import NdPolynomial, Structure
 
-
-__all__ = ['Section', 'TimeLine', 'MultiTimeLine']
+__all__ = ["Section", "TimeLine", "MultiTimeLine"]
 
 
 class Section(Structure):
-    """Helper class to store parameter states between events.
+    """
+    Helper class to store parameter states between events.
 
     Attributes
     ----------
@@ -36,18 +38,24 @@ class Section(Structure):
         if coeffs is int: Set constant value for for all entries
         if coeffs is list: Set value per component (check length!)
         if coeffs is ndarray (or list of lists): set polynomial coefficients
-
     """
 
-    coeffs = NdPolynomial(size=('n_entries', 'n_poly_coeffs'))
+    coeffs = NdPolynomial(size=("n_entries", "n_poly_coeffs"))
 
-    def __init__(self, start, end, coeffs, is_polynomial=False):
+    def __init__(
+        self,
+        start: float,
+        end: float,
+        coeffs: int | float | npt.ArrayLike,
+        is_polynomial: bool = False,
+    ) -> None:
+        """Construct section object."""
         if start > end:
             raise ValueError("End time must be greater than start time")
 
         self.start = start
         self.end = end
-        diff = end-start
+        diff = end - start
 
         coeffs = np.array(coeffs, ndmin=1, dtype=np.float64)
         self.parameter_shape = coeffs.shape
@@ -79,19 +87,19 @@ class Section(Structure):
                 self._poly_der.append(poly_der)
 
     @property
-    def is_polynomial(self):
+    def is_polynomial(self) -> bool:
         """bool: True if Section represents polynomial parameter. False otherwise."""
         if self.degree > 0:
             return True
         return False
 
     @property
-    def n_poly_coeffs(self):
+    def n_poly_coeffs(self) -> int:
         """int: Number of polynomial coefficients."""
         return self.degree + 1
 
     @property
-    def is_single_entry(self):
+    def is_single_entry(self) -> bool:
         """bool: True if Section contains single entry. False otherwise."""
         if self.n_entries > 1:
             return True
@@ -101,8 +109,9 @@ class Section(Structure):
 
         return False
 
-    def value(self, t):
-        """Return value of parameter section at time t.
+    def value(self, t: float) -> float:
+        """
+        Return value of parameter section at time t.
 
         Parameters
         ----------
@@ -118,10 +127,9 @@ class Section(Structure):
         ------
         ValueError
             If t is lower than start or larger than end of section time.
-
         """
         if np.any(t < self.start) or np.any(self.end < t):
-            raise ValueError('Time exceeds section times')
+            raise ValueError("Time exceeds section times")
 
         value = np.array([p(t) for p in self._poly])
 
@@ -129,8 +137,9 @@ class Section(Structure):
 
     __call__ = value
 
-    def coefficients(self, offset=0):
-        """Get coefficients at (time) offset.
+    def coefficients(self, offset: float = 0.0) -> np.ndarray:
+        """
+        Get coefficients at (time) offset.
 
         Parameters
         ----------
@@ -152,13 +161,16 @@ class Section(Structure):
 
         return np.array(coeffs).reshape(self.parameter_shape)
 
-    def derivative(self, t, order=1):
-        """Return derivative of parameter section at time t.
+    def derivative(self, t: float, order: Optional[int] = 1) -> np.ndarray:
+        """
+        Return derivative of parameter section at time t.
 
         Parameters
         ----------
         t : float
             Time at which function is evaluated.
+        order : int, default=1
+            Order of deriviation. @TODO: Not yet implemented.
 
         Returns
         -------
@@ -171,17 +183,19 @@ class Section(Structure):
             If t is lower than start or larger than end of section time.
         ValueError
             If order is larger than polynomial degree
-
         """
         if np.any(t < self.start) or np.any(self.end < t):
-            raise ValueError('Time exceeds section times')
+            raise ValueError("Time exceeds section times")
 
         deriv = np.array([p.deriv(t).coef for p in self._poly_der])
 
         return deriv
 
-    def integral(self, start=None, end=None):
-        """Return integral of function in interval [start, end].
+    def integral(
+        self, start: Optional[float] = None, end: Optional[float] = None
+    ) -> np.ndarray:
+        """
+        Return integral of function in interval [start, end].
 
         Parameters
         ----------
@@ -192,14 +206,13 @@ class Section(Structure):
 
         Returns
         -------
-        Y : float
+        Y : np.ndarray
             Value of definite integral between start and end.
 
         Raises
         ------
         ValueError
             If integration bounds exceed section times.
-
         """
         if start is None:
             start = self.start
@@ -207,12 +220,13 @@ class Section(Structure):
             end = self.end
 
         if not ((self.start <= start) & (start <= end) & (end <= self.end)):
-            raise ValueError('Integration bounds exceed section times')
+            raise ValueError("Integration bounds exceed section times")
 
         integ_methods = [p.integ(lbnd=start) for p in self._poly]
         return np.array([i(end) for i in integ_methods])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """str: String representation of the Section."""
         args = f"start={self.start}, end={self.end}, coeffs={self.coeffs}"
         if self.degree > 0:
             args += f", degree={self.degree}"
@@ -220,8 +234,9 @@ class Section(Structure):
         return f"Section({args})"
 
 
-class TimeLine():
-    """Class representing a timeline of time-varying data.
+class TimeLine:
+    """
+    Class representing a timeline of time-varying data.
 
     The timeline is made up of Sections, which are continuous time intervals.
     Each Section represents a piecewise polynomial function that defines the
@@ -233,28 +248,30 @@ class TimeLine():
         List of Sections that make up the timeline.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize TimeLine object."""
         self._sections = []
 
     @property
-    def sections(self):
+    def sections(self) -> list:
         """list: Sections of the TimeLine."""
         return self._sections
 
     @property
-    def degree(self):
+    def degree(self) -> int:
         """int: Degree of the polynomial functions used to represent each Section."""
         if len(self.sections) > 0:
             return self.sections[0].degree
 
     @property
-    def n_entries(self):
+    def n_entries(self) -> int:
         """int: Number of entries in the parameter vector for each Section."""
         if len(self.sections) > 0:
             return self.sections[0].n_entries
 
-    def add_section(self, section):
-        """Add a Section to the timeline.
+    def add_section(self, section: Section) -> None:
+        """
+        Add a Section to the timeline.
 
         Parameters
         ----------
@@ -270,24 +287,23 @@ class TimeLine():
             the other Sections in the timeline.
         CADETProcessError
             If the Section introduces a gap in the timeline.
-
         """
         if not isinstance(section, Section):
-            raise TypeError('Expected Section')
+            raise TypeError("Expected Section")
         if len(self.sections) > 0:
             if section.degree != self.degree:
-                raise CADETProcessError('Polynomial degree does not match')
+                raise CADETProcessError("Polynomial degree does not match")
 
             if not (section.start == self.end or section.end == self.start):
-                raise CADETProcessError('Sections times must be without gaps')
+                raise CADETProcessError("Sections times must be without gaps")
 
         self._sections.append(section)
         self._sections = sorted(self._sections, key=lambda sec: sec.start)
 
         self.update_piecewise_poly()
 
-    def update_piecewise_poly(self):
-        """Updates the piecewise polynomial representation of the timeline."""
+    def update_piecewise_poly(self) -> None:
+        """Update the piecewise polynomial representation of the timeline."""
         x = []
         coeffs = []
         for sec in self.sections:
@@ -305,23 +321,24 @@ class TimeLine():
         self._piecewise_poly = piecewise_poly
 
     @property
-    def piecewise_poly(self):
+    def piecewise_poly(self) -> list:
         """list: scipy.interpolate.PPoly for each dimension."""
         return self._piecewise_poly
 
-    def value(self, time):
-        """np.array: Value of parameter at given time
+    def value(self, time: float) -> np.ndarray:
+        """
+        np.ndarray: Value of parameter at given time.
 
         Parameters
         ----------
         time : np.float or array_like
             time points at which to evaluate.
-
         """
         return np.array([p(time) for p in self.piecewise_poly]).T
 
-    def coefficients(self, time):
-        """Return coefficient of polynomial at given time.
+    def coefficients(self, time: float) -> np.ndarray:
+        """
+        Return coefficient of polynomial at given time.
 
         Parameters
         ----------
@@ -330,17 +347,19 @@ class TimeLine():
 
         Returns
         -------
-        coefficients : np.array
+        coefficients : np.ndarray
             !!! Array of coefficients in ORDER !!!
-
         """
         section_index = self.section_index(time)
         c = self.sections[section_index].coefficients(time)
 
         return c
 
-    def integral(self, start=None, end=None):
-        """Calculate integral of sections in interval [start, end].
+    def integral(
+        self, start: Optional[float] = None, end: Optional[float] = None
+    ) -> np.ndarray:
+        """
+        Calculate integral of sections in interval [start, end].
 
         Parameters
         ----------
@@ -351,14 +370,13 @@ class TimeLine():
 
         Returns
         -------
-        Y : float
+        Y : np.ndarray
             Value of definite integral between start and end.
 
         Raises
         ------
         ValueError
             If integration bounds exceed section times.
-
         """
         if start is None:
             start = self.start
@@ -366,14 +384,13 @@ class TimeLine():
             end = self.end
 
         if not ((self.start <= start) & (start <= end) & (end <= self.end)):
-            raise ValueError('Integration bounds exceed section times')
+            raise ValueError("Integration bounds exceed section times")
 
-        return np.array(
-            [p.integrate(start, end) for p in self.piecewise_poly]
-        ).T
+        return np.array([p.integrate(start, end) for p in self.piecewise_poly]).T
 
-    def section_index(self, time):
-        """Return the index of the section that contains the specified time.
+    def section_index(self, time: float) -> int:
+        """
+        Return the index of the section that contains the specified time.
 
         Parameters
         ----------
@@ -390,26 +407,27 @@ class TimeLine():
         return np.argmin(time >= section_times) - 1
 
     @property
-    def section_times(self):
-        """list of float: The start and end times of all sections in the timeline."""
+    def section_times(self) -> list[float]:
+        """List of float: The start and end times of all sections in the timeline."""
         if len(self.sections) == 0:
             return []
 
         return [self.sections[0].start] + [sec.end for sec in self.sections]
 
     @property
-    def start(self):
+    def start(self) -> float:
         """float: The start time of the timeline."""
         return self.section_times[0]
 
     @property
-    def end(self):
+    def end(self) -> float:
         """float: The end time of the timeline."""
         return self.section_times[-1]
 
     @plotting.create_and_save_figure
-    def plot(self, ax, x_axis_in_minutes: bool = True) -> Axes:
-        """Plot the state of the timeline over time.
+    def plot(self, ax: Axes, x_axis_in_minutes: bool = True) -> Axes:
+        """
+        Plot the state of the timeline over time.
 
         Parameters
         ----------
@@ -436,20 +454,21 @@ class TimeLine():
         ax.plot(time, y)
 
         layout = plotting.Layout()
-        layout.x_label = '$time~/~s$'
+        layout.x_label = "$time~/~s$"
         if x_axis_in_minutes:
-            layout.x_label = '$time~/~min$'
-        layout.y_label = '$state$'
+            layout.x_label = "$time~/~min$"
+        layout.y_label = "$state$"
         layout.x_lim = (start, end)
-        layout.y_lim = (np.min(y), 1.1*np.max(y))
+        layout.y_lim = (np.min(y), 1.1 * np.max(y))
 
         plotting.set_layout(ax, layout)
 
         return ax
 
     @classmethod
-    def from_constant(cls, start, end, value):
-        """Create a timeline with a constant value for a given time range.
+    def from_constant(cls, start: float, end: float, value: float) -> TimeLine:
+        """
+        Create a timeline with a constant value for a given time range.
 
         Parameters
         ----------
@@ -471,8 +490,14 @@ class TimeLine():
         return tl
 
     @classmethod
-    def from_profile(cls, time, profile, s=1e-6):
-        """Create a timeline from a profile.
+    def from_profile(
+        cls,
+        time: npt.ArrayLike,
+        profile: npt.ArrayLike,
+        s: float = 1e-6,
+    ) -> TimeLine:
+        """
+        Create a timeline from a profile.
 
         Parameters
         ----------
@@ -487,9 +512,9 @@ class TimeLine():
         -------
         TimeLine
             A TimeLine instance with polynomial sections created from the profile.
-
         """
         from scipy import interpolate
+
         tl = cls()
 
         tck = interpolate.splrep(time, profile, s=s)
@@ -500,20 +525,19 @@ class TimeLine():
                 continue
             elif i > len(ppoly.x) - 5:
                 continue
-            end = ppoly.x[i+1]
-            tl.add_section(
-                Section(start, end, np.flip(sec), is_polynomial=True)
-            )
+            end = ppoly.x[i + 1]
+            tl.add_section(Section(start, end, np.flip(sec), is_polynomial=True))
 
         return tl
 
 
-class MultiTimeLine():
-    """Class for a collection of TimeLines with the same number of entries.
+class MultiTimeLine:
+    """
+    Class for a collection of TimeLines with the same number of entries.
 
     Attributes
     ----------
-    base_state : np.array
+    base_state : np.ndarray
         The base state that each TimeLine represents.
     n_entries : int
         The number of entries in each TimeLine.
@@ -523,13 +547,16 @@ class MultiTimeLine():
         The degree of the polynomials in each section.
     """
 
-    def __init__(self, base_state, is_polynomial=False):
-        """Initialize a MultiTimeLine instance.
+    def __init__(self, base_state: list, is_polynomial: bool = False) -> None:
+        """
+        Initialize a MultiTimeLine instance.
 
         Parameters
         ----------
         base_state : list
             The base state that each TimeLine represents.
+        is_polynomial : bool, optional
+            Option wheter MultiTimeLine is polynomial. The default is False
 
         """
         base_state = np.array(base_state, ndmin=1, dtype=np.float64)
@@ -549,28 +576,28 @@ class MultiTimeLine():
         self.time_lines = [TimeLine() for _ in range(self.size)]
 
     @property
-    def degree(self):
+    def degree(self) -> int:
         """int: The degree of the polynomials in each section."""
         return self._degree
 
     @degree.setter
-    def degree(self, degree):
+    def degree(self, degree: int) -> None:
         self._degree = degree
 
     @property
-    def n_entries(self):
+    def n_entries(self) -> int:
         """int: Number of entries handled by MultiTimeline."""
         if self.degree > 0:
             return len(self.base_state)
         return self.base_state.size
 
     @property
-    def size(self):
+    def size(self) -> int:
         """int: Total number of internal TimeLines handled Number by MultiTimeline."""
         return self.base_state.size
 
     @property
-    def section_times(self):
+    def section_times(self) -> list:
         """list: Combined section times of all TimeLines."""
         time_line_sections = [tl.section_times for tl in self.time_lines]
 
@@ -578,8 +605,9 @@ class MultiTimeLine():
 
         return sorted(list(section_times))
 
-    def add_section(self, section, entry_index):
-        """Add section to TimeLine with specific entry index.
+    def add_section(self, section: Section, entry_index: tuple) -> None:
+        """
+        Add section to TimeLine with specific entry index.
 
         Parameters
         ----------
@@ -592,7 +620,6 @@ class MultiTimeLine():
         ------
         ValueError
             If entry index is out of bounds for base_state.
-
         """
         index = flatten_index(self.base_state.shape, entry_index)[0]
         if index > self.size:
@@ -600,7 +627,7 @@ class MultiTimeLine():
         self.time_lines[index].add_section(section)
 
     @property
-    def combined_time_line(self):
+    def combined_time_line(self) -> TimeLine:
         """TimeLine: Object representing combination of all timelines in the MultiTimeLine."""
         tl = TimeLine()
 
@@ -611,7 +638,7 @@ class MultiTimeLine():
         section_times = self.section_times
         for iSec in range(len(section_times) - 1):
             start = self.section_times[iSec]
-            end = self.section_times[iSec+1]
+            end = self.section_times[iSec + 1]
 
             if not self.is_polynomial:
                 for i, entry in enumerate(self.time_lines):
@@ -621,7 +648,9 @@ class MultiTimeLine():
                         coeffs[index] = coeff
             else:
                 for i_entry in range(self.n_entries):
-                    tl_indices = slice(i_entry*n_poly_coeffs, (i_entry+1)*n_poly_coeffs)
+                    tl_indices = slice(
+                        i_entry * n_poly_coeffs, (i_entry + 1) * n_poly_coeffs
+                    )
                     i_entry_tl = self.time_lines[tl_indices]
                     for i_poly, i_poly_tl in enumerate(i_entry_tl):
                         if self.is_single_entry:
@@ -629,7 +658,10 @@ class MultiTimeLine():
                         else:
                             index = (i_entry, i_poly)
 
-                        if len(i_poly_tl.sections) > 0 and start in i_poly_tl.section_times:
+                        if (
+                            len(i_poly_tl.sections) > 0
+                            and start in i_poly_tl.section_times
+                        ):
                             coeffs[index] = i_poly_tl.coefficients(start)[0]
 
             section = Section(start, end, coeffs, self.is_polynomial)
@@ -640,7 +672,10 @@ class MultiTimeLine():
         return tl
 
 
-def generate_indices(shape, indices=None):
+def generate_indices(
+    shape: tuple[int, ...],
+    indices: Optional[list[list[int]]] = None,
+) -> list[tuple]:
     """
     Generate tuples representing indices for an array with a given shape.
 
@@ -674,13 +709,17 @@ def generate_indices(shape, indices=None):
     [(0, 1), (1, 2)]
     """
     if not shape:
-        raise ValueError("Shape must not be empty, scalar parameters are not supported.")
+        raise ValueError(
+            "Shape must not be empty, scalar parameters are not supported."
+        )
 
     if indices is None:
         indices = np.s_[:]
 
     if not isinstance(indices, list):
-        indices = [indices, ]
+        indices = [
+            indices,
+        ]
 
     indices_array = np.array(indices, ndmin=1)
 
@@ -694,7 +733,7 @@ def generate_indices(shape, indices=None):
     return indices
 
 
-def _validate_indices(shape, indices):
+def _validate_indices(shape: tuple[int, ...], indices: list[list[int]]) -> None:
     """Validate that all indices can be set in an array with shape `shape`."""
     param_ref = np.arange(np.prod(shape)).reshape(shape)
 
@@ -702,7 +741,7 @@ def _validate_indices(shape, indices):
         param_ref[ind]
 
 
-def unravel(shape, indices):
+def unravel(shape: tuple[int, ...], indices: list[int] | tuple) -> list[tuple]:
     """
     Unravel indices of a multi-dimensional array.
 
@@ -736,8 +775,9 @@ def unravel(shape, indices):
     return indices_unraveled
 
 
-def flatten_index(shape, indices):
-    """Flatten indices to access array.
+def flatten_index(shape: tuple[int], indices: tuple | list[tuple]) -> list[int]:
+    """
+    Flatten indices to access array.
 
     Parameters
     ----------
@@ -759,8 +799,9 @@ def flatten_index(shape, indices):
     return [indices_flat_ref[i] for i in indices]
 
 
-def unflatten_index(shape, indices_flat):
-    """Unflatten indices to access array.
+def unflatten_index(shape: tuple[int, ...], indices_flat: int | list[int]) -> list[int]:
+    """
+    Unflatten indices to access array.
 
     Parameters
     ----------
@@ -783,7 +824,7 @@ def unflatten_index(shape, indices_flat):
     return indices
 
 
-def get_inhomogeneous_shape(value):
+def get_inhomogeneous_shape(value: np.ndarray) -> list[tuple[int, ...]]:
     """If array is inhomogeneous, return list with shape of every element."""
     with warnings.catch_warnings():  # Catch warnings for compatibility with numpy<1.24
         warnings.simplefilter("error")
@@ -801,16 +842,16 @@ def get_inhomogeneous_shape(value):
     return shape
 
 
-def get_full_shape(inhomogeneous_shape):
+def get_full_shape(inhomogeneous_shape: list) -> tuple[int]:
     """Create full shape from inhomogeneous shape to be used with numpy arrays."""
-    first_dimension = (len(inhomogeneous_shape))
+    first_dimension = len(inhomogeneous_shape)
 
     sub_dims = ()
     for sub_dim in inhomogeneous_shape:
         if not isinstance(sub_dim, tuple):
             sub_dim = get_full_shape(sub_dim)
 
-        sub_dims += (sub_dim, )
+        sub_dims += (sub_dim,)
 
     max_dims = {}
     for el in sub_dims:
@@ -820,12 +861,14 @@ def get_full_shape(inhomogeneous_shape):
             except KeyError:
                 max_dims[i] = dim
 
-    dims = (first_dimension, ) + tuple(max_dims.values())
+    dims = (first_dimension,) + tuple(max_dims.values())
 
     return dims
 
 
-def extract_inhomogeneous_array(full_array, inhomogeneous_shape):
+def extract_inhomogeneous_array(
+    full_array: np.ndarray, inhomogeneous_shape: tuple[int, ...]
+) -> None:
     """Get inhomogeneous array from full_array."""
     array = []
     for i in inhomogeneous_shape:

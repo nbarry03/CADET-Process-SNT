@@ -1,18 +1,19 @@
 import warnings
+from typing import Optional
 
+import numpy as np
+import numpy.typing as npt
 from scipy import optimize
 from scipy.optimize import OptimizeWarning
-import numpy as np
 
 from CADETProcess import CADETProcessError
-from CADETProcess.dataStructure import (
-    Bool, Switch, UnsignedInteger, UnsignedFloat
-)
-from CADETProcess.optimization import OptimizerBase, OptimizationProblem
+from CADETProcess.dataStructure import Bool, Switch, UnsignedFloat, UnsignedInteger
+from CADETProcess.optimization import OptimizationProblem, OptimizerBase
 
 
 class SciPyInterface(OptimizerBase):
-    """Wrapper around scipy's optimization suite.
+    """
+    Wrapper around scipy's optimization suite.
 
     Defines the bounds and all constraints, saved in a constraint_object. Also
     the jacobian matrix is defined for several solvers.
@@ -46,15 +47,21 @@ class SciPyInterface(OptimizerBase):
     scipy.optimize.minimize
 
     """
+
     finite_diff_rel_step = UnsignedFloat()
     tol = UnsignedFloat()
-    jac = Switch(valid=['2-point', '3-point', 'cs'], default='2-point')
+    jac = Switch(valid=["2-point", "3-point", "cs"], default="2-point")
 
-    def run(self, optimization_problem: OptimizationProblem, x0=None):
-        """Solve the optimization problem using any of the scipy methods.
+    def _run(
+        self,
+        optimization_problem: OptimizationProblem,
+        x0: Optional[list] = None,
+    ) -> None:
+        """
+        Solve the optimization problem using any of the scipy methods.
 
-        Returns
-        -------
+        Parameters
+        ----------
         results : OptimizationResults
             Optimization results including optimization_problem and solver
             configuration.
@@ -70,20 +77,23 @@ class SciPyInterface(OptimizerBase):
         CADETProcess.optimization.OptimizationProblem.evaluate_objectives
         options
         scipy.optimize.minimize
-
         """
         self.n_evals = 0
 
         if optimization_problem.n_objectives > 1:
             raise CADETProcessError("Can only handle single objective.")
 
-        def objective_function(x):
+        def objective_function(x: npt.ArrayLike) -> np.ndarray:
             return optimization_problem.evaluate_objectives(
-                x, untransform=True, get_dependent_values=True, ensure_minimization=True,
+                x,
+                untransform=True,
+                get_dependent_values=True,
+                ensure_minimization=True,
             )[0]
 
-        def callback_function(x, state=None):
-            """Internal callback to report progress after evaluation.
+        def callback_function(x: npt.ArrayLike, state: dict = None) -> bool:
+            """
+            Report progress after evaluation.
 
             Notes
             -----
@@ -103,10 +113,14 @@ class SciPyInterface(OptimizerBase):
                 ensure_minimization=True,
             )
             g = optimization_problem.evaluate_nonlinear_constraints(
-                x, untransform=True, get_dependent_values=True,
+                x,
+                untransform=True,
+                get_dependent_values=True,
             )
             cv = optimization_problem.evaluate_nonlinear_constraints_violation(
-                x, untransform=True, get_dependent_values=True,
+                x,
+                untransform=True,
+                get_dependent_values=True,
             )
 
             self.run_post_processing(x, f, g, cv, self.n_evals)
@@ -124,13 +138,13 @@ class SciPyInterface(OptimizerBase):
         if self.results.n_gen > 0:
             x0 = self.results.population_last.x[0, :]
             self.n_evals = self.results.n_evals
-            options['maxiter'] = self.maxiter - self.n_evals
-            if str(self) == 'COBYLA':
-                options['maxiter'] -= 1
+            options["maxiter"] = self.maxiter - self.n_evals
+            if str(self) == "COBYLA":
+                options["maxiter"] -= 1
 
         with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', category=OptimizeWarning)
-            warnings.filterwarnings('ignore', category=RuntimeWarning)
+            warnings.filterwarnings("ignore", category=OptimizeWarning)
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
             scipy_results = optimize.minimize(
                 objective_function,
                 x0=x0_transformed,
@@ -147,9 +161,9 @@ class SciPyInterface(OptimizerBase):
         self.results.exit_flag = scipy_results.status
         self.results.exit_message = scipy_results.message
 
-    def get_bounds(self, optimization_problem):
-        """Returns the optimized bounds of a given optimization_problem as a
-        Bound object.
+    def get_bounds(self, optimization_problem: OptimizationProblem) -> optimize.Bounds:
+        """
+        Return the optimized bounds of a given optimization_problem as a Bound object.
 
         Optimizes the bounds of the optimization_problem by calling the method
         optimize.Bounds. Keep_feasible is set to True.
@@ -162,11 +176,12 @@ class SciPyInterface(OptimizerBase):
         return optimize.Bounds(
             optimization_problem.lower_bounds_independent_transformed,
             optimization_problem.upper_bounds_independent_transformed,
-            keep_feasible=True
+            keep_feasible=True,
         )
 
-    def get_constraint_objects(self, optimization_problem):
-        """Return constraints as objets.
+    def get_constraint_objects(self, optimization_problem: OptimizationProblem) -> list:
+        """
+        Return constraints as objets.
 
         Returns
         -------
@@ -188,8 +203,11 @@ class SciPyInterface(OptimizerBase):
 
         return [con for con in constraints if con is not None]
 
-    def get_lincon_obj(self, optimization_problem):
-        """Return the linear constraints as an object.
+    def get_lincon_obj(
+        self, optimization_problem: OptimizationProblem
+    ) -> optimize.LinearConstraint:
+        """
+        Return the linear constraints as an object.
 
         Returns
         -------
@@ -206,15 +224,18 @@ class SciPyInterface(OptimizerBase):
         if optimization_problem.n_linear_constraints == 0:
             return None
 
-        lb = [-np.inf]*len(optimization_problem.b)
+        lb = [-np.inf] * len(optimization_problem.b)
         ub = optimization_problem.b_transformed
 
         return optimize.LinearConstraint(
             optimization_problem.A_independent_transformed, lb, ub, keep_feasible=True
         )
 
-    def get_lineqcon_obj(self, optimization_problem):
-        """Return the linear equality constraints as an object.
+    def get_lineqcon_obj(
+        self, optimization_problem: OptimizationProblem
+    ) -> optimize.LinearConstraint:
+        """
+        Return the linear equality constraints as an object.
 
         Returns
         -------
@@ -235,12 +256,12 @@ class SciPyInterface(OptimizerBase):
         ub = optimization_problem.beq_transformed + optimization_problem.eps_lineq
 
         return optimize.LinearConstraint(
-            optimization_problem.Aeq_independent_transformed, lb, ub,
-            keep_feasible=True
+            optimization_problem.Aeq_independent_transformed, lb, ub, keep_feasible=True
         )
 
-    def get_nonlincon_obj(self, optimization_problem):
-        """Return the optimized nonlinear constraints as an object.
+    def get_nonlincon_obj(self, optimization_problem: OptimizationProblem) -> list:
+        """
+        Return the optimized nonlinear constraints as an object.
 
         Returns
         -------
@@ -257,8 +278,9 @@ class SciPyInterface(OptimizerBase):
 
         opt = optimization_problem
 
-        def makeConstraint(i):
-            """Create optimize.NonlinearConstraint object.
+        def makeConstraint(i: int) -> optimize.NonlinearConstraint:
+            """
+            Create optimize.NonlinearConstraint object.
 
             Parameters
             ----------
@@ -277,11 +299,14 @@ class SciPyInterface(OptimizerBase):
             """
             constr = optimize.NonlinearConstraint(
                 lambda x: opt.evaluate_nonlinear_constraints_violation(
-                    x, untransform=True, get_dependent_values=True,
+                    x,
+                    untransform=True,
+                    get_dependent_values=True,
                 )[i],
-                lb=-np.inf, ub=0,
+                lb=-np.inf,
+                ub=0,
                 finite_diff_rel_step=self.finite_diff_rel_step,
-                keep_feasible=True
+                keep_feasible=True,
             )
             return constr
 
@@ -291,12 +316,14 @@ class SciPyInterface(OptimizerBase):
 
         return constraints
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """str: String representation."""
         return self.__class__.__name__
 
 
 class TrustConstr(SciPyInterface):
-    """Wrapper for the trust-constr optimization method from the scipy optimization suite.
+    """
+    Wrapper for the trust-constr optimization method from the scipy optimization suite.
 
     It defines the solver options in the 'options' variable as a dictionary.
 
@@ -325,36 +352,44 @@ class TrustConstr(SciPyInterface):
         Default is 1e-8.
     initial_tr_radius : float, optional
         Initial trust radius. The trust radius gives the maximum distance between solution points
-        in consecutive iterations. It reflects the trust the algorithm puts in the local approximation
-        of the optimization problem. For an accurate local approximation, the trust-region should be large,
-        and for an approximation valid only close to the current point, it should be a small one.
-        The trust radius is automatically updated throughout the optimization process,
-        with initial_tr_radius being its initial value. Default is 1.
+        in consecutive iterations. It reflects the trust the algorithm puts in the local
+        approximation of the optimization problem. For an accurate local approximation, the
+        trust-region should be large, and for an approximation valid only close to the current
+        point, it should be a small one. The trust radius is automatically updated throughout the
+        optimization process, with initial_tr_radius being its initial value. Default is 1.
     initial_constr_penalty : float, optional
         Initial constraints penalty parameter. The penalty parameter is used for balancing
         the requirements of decreasing the objective function and satisfying the constraints.
         It is used for defining the merit function: merit_function(x) = fun(x)
         + constr_penalty * constr_norm_l2(x), where constr_norm_l2(x) is the l2 norm of a vector
-        containing all the constraints. The merit function is used for accepting or rejecting trial points,
-        and constr_penalty weights the two conflicting goals of reducing the objective function and constraints.
-        The penalty is automatically updated throughout the optimization process,
-        with initial_constr_penalty being its initial value. Default is 1.
+        containing all the constraints. The merit function is used for accepting or rejecting trial
+        points, and constr_penalty weights the two conflicting goals of reducing the objective
+        function and constraints. The penalty is automatically updated throughout the optimization
+        process, with initial_constr_penalty being its initial value. Default is 1.
     initial_barrier_parameter : float, optional
         Initial barrier parameter. Used only when inequality constraints are present.
-        For dealing with optimization problems min_x f(x) subject to inequality constraints c(x) <= 0,
+        For dealing with optimization problems min_x f(x) subject to inequality constraints
+        c(x) <= 0,
         the algorithm introduces slack variables, solving the problem
-        min_(x, s) f(x) + barrier_parameter * sum(ln(s)) subject to the equality constraints c(x) + s = 0
-        instead of the original problem. This subproblem is solved for decreasing values of barrier_parameter
-        and with decreasing tolerances for the termination, starting with initial_barrier_parameter for the barrier parameter.
-        Default is 0.1.
+        min_(x, s) f(x) + barrier_parameter * sum(ln(s))
+        subject to the equality constraints
+        c(x) + s = 0
+        instead of the original problem.
+        This subproblem is solved for decreasing values of barrier_parameter and with decreasing
+        tolerances for the termination, starting with initial_barrier_parameter for the barrier
+        parameter. Default is 0.1.
     initial_barrier_tolerance : float, optional
-        Initial tolerance for the barrier subproblem. Used only when inequality constraints are present.
-        For dealing with optimization problems min_x f(x) subject to inequality constraints c(x) <= 0,
+        Initial tolerance for the barrier subproblem. Used only when inequality constraints are
+        present. For dealing with optimization problems min_x f(x) subject to inequality constraints
+        c(x) <= 0,
         the algorithm introduces slack variables, solving the problem
-        min_(x, s) f(x) + barrier_parameter * sum(ln(s)) subject to the equality constraints c(x) + s = 0
-        instead of the original problem. This subproblem is solved for decreasing values of barrier_parameter
-        and with decreasing tolerances for the termination, starting with initial_barrier_tolerance for the barrier tolerance.
-        Default is 0.1.
+        min_(x, s) f(x) + barrier_parameter * sum(ln(s))
+        subject to the equality constraints
+        c(x) + s = 0
+        instead of the original problem.
+        This subproblem is solved for decreasing values of barrier_parameter
+        and with decreasing tolerances for the termination, starting with initial_barrier_tolerance
+        for the barrier tolerance. Default is 0.1.
     factorization_method : str or None, optional
         Method to factorize the Jacobian of the constraints.
         Use None (default) for auto selection or one of:
@@ -376,8 +411,8 @@ class TrustConstr(SciPyInterface):
         - 3 for more complete progress report.
     disp : Bool, optional
         If True, then verbose will be set to 1 if it was 0. Default is False.
-
     """
+
     supports_linear_constraints = True
     supports_linear_equality_constraints = True
     supports_nonlinear_constraints = True
@@ -390,30 +425,46 @@ class TrustConstr(SciPyInterface):
     initial_constr_penalty = UnsignedFloat(default=1.0)
     initial_barrier_parameter = UnsignedFloat(default=0.1)
     initial_barrier_tolerance = UnsignedFloat(default=0.1)
-    factorization_method = Switch(valid=[
-        'NormalEquation', 'AugmentedSystem', 'QRFactorization', 'SVDFactorization'
-    ])
+    factorization_method = Switch(
+        valid=[
+            "NormalEquation",
+            "AugmentedSystem",
+            "QRFactorization",
+            "SVDFactorization",
+        ]
+    )
     maxiter = UnsignedInteger(default=1000)
     verbose = UnsignedInteger(default=0)
     disp = Bool(default=False)
 
     x_tol = xtol            # Alias for uniform interface
-    cv_nonlincon_tol = gtol # Alias for uniform interface
+    cv_nonlincon_tol = gtol  # Alias for uniform interface
     n_max_evals = maxiter   # Alias for uniform interface
     n_max_iter = maxiter    # Alias for uniform interface
 
     _specific_options = [
-        'gtol', 'xtol', 'barrier_tol', 'finite_diff_rel_step',
-        'initial_constr_penalty', 'initial_tr_radius', 'initial_barrier_parameter',
-        'initial_barrier_tolerance', 'factorization_method', 'maxiter', 'verbose', 'disp'
+        "gtol",
+        "xtol",
+        "barrier_tol",
+        "finite_diff_rel_step",
+        "initial_constr_penalty",
+        "initial_tr_radius",
+        "initial_barrier_parameter",
+        "initial_barrier_tolerance",
+        "factorization_method",
+        "maxiter",
+        "verbose",
+        "disp",
     ]
 
-    def __str__(self):
-        return 'trust-constr'
+    def __str__(self) -> str:
+        """str: String representation."""
+        return "trust-constr"
 
 
 class COBYLA(SciPyInterface):
-    """Wrapper for the COBYLA optimization method from the scipy optimization suite.
+    """
+    Wrapper for the COBYLA optimization method from the scipy optimization suite.
 
     It defines the solver options in the 'options' variable as a dictionary.
 
@@ -436,8 +487,8 @@ class COBYLA(SciPyInterface):
         Maximum number of function evaluations.
     catol : float, default 2e-4
         Absolute tolerance for constraint violations.
-
     """
+
     supports_linear_constraints = True
     supports_linear_equality_constraints = True
     supports_nonlinear_constraints = True
@@ -454,11 +505,12 @@ class COBYLA(SciPyInterface):
     n_max_evals = maxiter       # Alias for uniform interface
     n_max_iter = maxiter        # Alias for uniform interface
 
-    _specific_options = ['rhobeg', 'tol', 'maxiter', 'disp', 'catol']
+    _specific_options = ["rhobeg", "tol", "maxiter", "disp", "catol"]
 
 
 class NelderMead(SciPyInterface):
-    """Wrapper for the Nelder-Mead optimization method from the scipy optimization suite.
+    """
+    Wrapper for the Nelder-Mead optimization method from the scipy optimization suite.
 
     Supports:
         - Bounds.
@@ -483,6 +535,7 @@ class NelderMead(SciPyInterface):
     disp : Bool, optional
         Set to True to print convergence messages.
     """
+
     supports_bounds = True
 
     maxiter = UnsignedInteger(default=1000)
@@ -498,15 +551,22 @@ class NelderMead(SciPyInterface):
     n_max_iter = maxiter    # Alias for uniform interface
 
     _specific_options = [
-        'maxiter', 'initial_simplex', 'xatol', 'fatol', 'adaptive', 'disp'
+        "maxiter",
+        "initial_simplex",
+        "xatol",
+        "fatol",
+        "adaptive",
+        "disp",
     ]
 
-    def __str__(self):
-        return 'Nelder-Mead'
+    def __str__(self) -> str:
+        """str: String representation."""
+        return "Nelder-Mead"
 
 
 class SLSQP(SciPyInterface):
-    """Wrapper for the SLSQP optimization method from the scipy optimization suite.
+    """
+    Wrapper for the SLSQP optimization method from the scipy optimization suite.
 
     It defines the solver options in the 'options' variable as a dictionary.
 
@@ -550,5 +610,10 @@ class SLSQP(SciPyInterface):
     n_max_iter = maxiter    # Alias for uniform interface
 
     _specific_options = [
-        'ftol', 'eps', 'disp', 'maxiter', 'finite_diff_rel_step', 'iprint'
+        "ftol",
+        "eps",
+        "disp",
+        "maxiter",
+        "finite_diff_rel_step",
+        "iprint",
     ]
