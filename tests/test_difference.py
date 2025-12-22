@@ -491,5 +491,44 @@ class TestFractionation(unittest.TestCase):
         np.testing.assert_almost_equal(metrics, metrics_expected)
 
 
+from CADETProcess.comparison import DerivativeRMSE
+
+
+class TestDerivativeRMSE(unittest.TestCase):
+    def test_metric(self):
+        # Compare with itself
+        component_system = ComponentSystem(1)
+        reference = ReferenceIO(
+            "simple",
+            time,
+            solution_2_gaussian[:, [0]],
+            component_system=component_system
+        )
+        difference = DerivativeRMSE(reference)
+        metrics_expected = [0]
+        metrics = difference.evaluate(reference)
+        np.testing.assert_almost_equal(metrics, metrics_expected)
+
+        # Compare with other Gaussian Peak
+        component_system = ComponentSystem(1)
+        solution = ReferenceIO(
+            "simple",
+            time,
+            solution_2_gaussian[:, [1]],
+            component_system=component_system,
+        )
+
+        difference = DerivativeRMSE(reference)
+        metrics_expected = [0.00555544]
+        metrics = difference.evaluate(solution)
+        np.testing.assert_almost_equal(metrics, metrics_expected)
+
+        difference = DerivativeRMSE(reference, resample=True)
+        metrics_expected = [0.00555544]
+        metrics = difference.evaluate(solution)
+        np.testing.assert_almost_equal(metrics, metrics_expected)
+
+
+
 if __name__ == "__main__":
     unittest.main()
