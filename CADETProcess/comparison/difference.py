@@ -42,6 +42,7 @@ __all__ = [
     "BreakthroughHeight",
     "BreakthroughPosition",
     "FractionationSSE",
+    "DerivativeRMSE",
     "ThresholdPeak"
 ]
 
@@ -1210,6 +1211,20 @@ class FractionationSSE(DifferenceBase):
 
         return sse
 
+
+class DerivativeRMSE(DifferenceBase):
+    """Root mean squared errors (RMSE) of derivative difference metric."""
+
+    _valid_references = (SolutionIO, ReferenceIO)
+
+    def _evaluate(self, solution: SolutionBase) -> np.ndarray:
+
+        sol_der = solution.derivative
+        ref_der = self.reference.solution.derivative
+        rmse = calculate_rmse(sol_der, ref_der.solution)
+
+        return rmse
+      
 
 def threshold_peak(
         solution:np.ndarray,
