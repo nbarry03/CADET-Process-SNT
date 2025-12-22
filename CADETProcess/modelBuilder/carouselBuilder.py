@@ -1,7 +1,7 @@
 import warnings
 from copy import deepcopy
 from functools import wraps
-from typing import Any, NoReturn, Optional, Union
+from typing import Any, Iterable, List, NoReturn, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,10 +37,59 @@ __all__ = [
     "SerialZone",
     "ParallelZone",
     "CarouselBuilder",
+    "SerialCarouselBuilder",
     "SMBBuilder",
     "LinearSMBBuilder",
     "LangmuirSMBBuilder",
 ]
+
+
+class Column:
+    def __init__(self, index: int, subunits: List[TubularReactorBase]) -> NoReturn:
+        """
+        Initialize a Column instance.
+
+        Parameters
+        ----------
+        index : int
+            Column index number.
+        subunits : List[TubularReactorBase]
+            List of column subunits that comprise the column.
+        """
+        self.index = index
+        self.subunits = subunits
+
+    @property
+    def top(self) -> TubularReactorBase:
+        return self.subunits[0]
+
+    @property
+    def bottom(self) -> TubularReactorBase:
+        return self.subunits[-1]
+
+
+class Column:
+    def __init__(self, index: int, subunits: List[TubularReactorBase]) -> NoReturn:
+        """
+        Initialize a Column instance.
+
+        Parameters
+        ----------
+        index : int
+            Column index number.
+        subunits : List[TubularReactorBase]
+            List of column subunits that comprise the column.
+        """
+        self.index = index
+        self.subunits = subunits
+
+    @property
+    def top(self) -> TubularReactorBase:
+        return self.subunits[0]
+
+    @property
+    def bottom(self) -> TubularReactorBase:
+        return self.subunits[-1]
 
 
 class ZoneBaseClass(UnitBaseClass):
@@ -223,6 +272,7 @@ class CarouselBuilder(Structure):
         self.name = name
         self._flow_sheet = FlowSheet(component_system, name)
         self._column = None
+        self._columns: List[Column] = []
         self.valve_parameters = valve_parameters
 
     @property
@@ -231,17 +281,33 @@ class CarouselBuilder(Structure):
         return self._flow_sheet
 
     @property
-    def column(self) -> TubularReactorBase:
-        """TubularReactorBase: The column template for all zones."""
+    def column(self) -> Tuple[TubularReactorBase, ...]:
+        """Tuple[TubularReactorBase]: The column template for all zones."""
         return self._column
 
+    @property
+    def columns(self) -> Tuple[Column]:
+        """Tuple[Column]: Columns in the carousel system."""
+        return self._columns
+
     @column.setter
-    def column(self, column: TubularReactorBase) -> NoReturn:
-        if not isinstance(column, TubularReactorBase):
-            raise TypeError("Column must be an instance of TubularReactorBase.")
-        if self.component_system is not column.component_system:
-            raise CADETProcessError("Number of components does not match.")
+    def column(
+        self, column: TubularReactorBase | Iterable[TubularReactorBase]
+    ) -> NoReturn:
+        if isinstance(column, TubularReactorBase):
+            column = (column,)
+        elif isinstance(column, Iterable) and all(
+            isinstance(c, TubularReactorBase) for c in column
+        ):
+            column = tuple(column)
+        else:
+            raise TypeError("Column must be an instance or list of TubularReactorBase.")
+        for col in column:
+            if col.component_system is not self.component_system:
+                raise CADETProcessError("Number of components does not match.")
+
         self._column = column
+        self._columns.clear()
 
     @wraps(FlowSheet.add_unit)
     def add_unit(self, *args: Any, **kwargs: Any) -> None:
@@ -316,28 +382,48 @@ class CarouselBuilder(Structure):
     def _add_units(self, flow_sheet: FlowSheet) -> None:
         """Add units to flow_sheet."""
         col_index = 0
+
+        def add_zone(zone: ZoneBaseClass) -> None:
+            """Add a zone and its columns and subunits to the flow sheet."""
+            nonlocal col_index
+            # Add zone inlet/outlet units
+            flow_sheet.add_unit(zone.inlet_unit)
+            flow_sheet.add_unit(zone.outlet_unit)
+            for i_col in range(zone.n_columns):
+                # Store subunits for easier structured access
+                subunits = []
+
+                # Add column subunits
+                for sub in deepcopy(self.column):
+                    sub.component_system = self.component_system
+                    sub.name = (
+                        f"column_"
+                        f"{sub.name + '_' if len(self.column) > 1 else ''}"
+                        f"{col_index}"
+                    )
+                    if zone.initial_state is not None:
+                        sub.initial_state = zone.initial_state[i_col]
+                    flow_sheet.add_unit(sub)
+                    subunits.append(sub)
+
+                # Aggregate Column objects
+                self.columns.append(Column(index=col_index, subunits=subunits))
+                col_index += 1
+
         for unit in self.flow_sheet.units:
+            # Not column zone unit
             if not isinstance(unit, ZoneBaseClass):
-                is_feed_inlet = unit in self.flow_sheet.feed_inlets
-                is_eluent_inlet = unit in self.flow_sheet.eluent_inlets
-                is_output_outlet = unit in self.flow_sheet.product_outlets
-                flow_sheet.add_unit(
-                    unit,
-                    feed_inlet=is_feed_inlet,
-                    eluent_inlet=is_eluent_inlet,
-                    product_outlet=is_output_outlet,
-                )
+                # Aggregate inlet/outlet kwargs
+                flags = {
+                    "feed_inlet": unit in self.flow_sheet.feed_inlets,
+                    "eluent_inlet": unit in self.flow_sheet.eluent_inlets,
+                    "product_outlet": unit in self.flow_sheet.product_outlets,
+                }
+                flow_sheet.add_unit(unit, **flags)
+
+            # Column zone unit
             else:
-                flow_sheet.add_unit(unit.inlet_unit)
-                flow_sheet.add_unit(unit.outlet_unit)
-                for i_col in range(unit.n_columns):
-                    col = deepcopy(self.column)
-                    col.component_system = self.component_system
-                    col.name = f"column_{col_index}"
-                    if unit.initial_state is not None:
-                        col.initial_state = unit.initial_state[i_col]
-                    flow_sheet.add_unit(col)
-                    col_index += 1
+                add_zone(unit)
 
     def _add_inter_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
         """Add connections between zones."""
@@ -354,21 +440,26 @@ class CarouselBuilder(Structure):
                     flow_sheet.add_connection(origin, destination)
 
     def _add_intra_zone_connections(self, flow_sheet: FlowSheet) -> NoReturn:
-        """Add connections within zones."""
-        for zone in self.zones:
-            for col_index in range(self.n_columns):
-                col = flow_sheet[f"column_{col_index}"]
-                flow_sheet.add_connection(zone.inlet_unit, col)
-                col = flow_sheet[f"column_{col_index}"]
-                flow_sheet.add_connection(col, zone.outlet_unit)
+        """Add connections within column template and within zones."""
+        # Connect subunits within each column
+        for col in self.columns:
+            for upstream, downstream in zip(col.subunits, col.subunits[1:]):
+                flow_sheet.add_connection(upstream, downstream)
 
-        for col_index in range(self.n_columns):
-            col_orig = flow_sheet[f"column_{col_index}"]
-            if col_index < self.n_columns - 1:
-                col_dest = flow_sheet[f"column_{col_index + 1}"]
-            else:
-                col_dest = flow_sheet[f"column_{0}"]
-            flow_sheet.add_connection(col_orig, col_dest)
+        # Connect zone inlets/outlets to column tops/bottoms respectively
+        for zone in self.zones:
+            for col in self.columns:
+                flow_sheet.add_connection(zone.inlet_unit, col.top)
+                flow_sheet.add_connection(col.bottom, zone.outlet_unit)
+
+        # Connect each bottom of each column to the top of next
+        self._add_ring_connections(flow_sheet)
+
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """Add connections between columns in a ring formation."""
+        cols = self.columns
+        for this_col, next_col in zip(cols, cols[1:] + cols[:1]):
+            flow_sheet.add_connection(this_col.bottom, next_col.top)
 
     def _set_output_states(self, flow_sheet: FlowSheet) -> NoReturn:
         for unit in self.flow_sheet.output_states:
@@ -410,64 +501,72 @@ class CarouselBuilder(Structure):
 
         for carousel_state in range(self.n_columns):
             position_counter = 0
+
             for i_zone, zone in enumerate(self.zones):
                 col_indices = np.arange(zone.n_columns)
                 col_indices += position_counter
-                col_indices = self.column_indices_at_state(col_indices, carousel_state)
+                rotated_indices = self.column_indices_at_state(
+                    col_indices, carousel_state
+                )
+                cols = [self.columns[i] for i in rotated_indices]
 
                 if isinstance(zone, SerialZone):
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
                         f"flow_sheet.output_states.{zone.inlet_unit}",
-                        col_indices[0],
+                        cols[0].index,
                     )
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
                     )
-                    for i, col in enumerate(col_indices):
-                        if i < (zone.n_columns - 1):
-                            evt = process.add_event(
-                                f"column_{col}_{carousel_state}",
-                                f"flow_sheet.output_states.column_{col}",
-                                self.n_zones,
-                            )
-                        else:
-                            evt = process.add_event(
-                                f"column_{col}_{carousel_state}",
-                                f"flow_sheet.output_states.column_{col}",
-                                i_zone,
-                            )
+
+                    # Current column either feeds next column or goes
+                    # to outlet
+                    for seq_i, col in enumerate(cols):
+                        dest = self.n_zones if seq_i < zone.n_columns - 1 else i_zone
+                        evt = process.add_event(
+                            f"column_{col.index}_{carousel_state}",
+                            f"flow_sheet.output_states.{col.bottom.name}",
+                            dest,
+                        )
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
                         )
+
                 elif isinstance(zone, ParallelZone):
-                    output_state = self.n_columns * [0]
-                    for col in col_indices:
-                        output_state[col] = 1 / zone.n_columns
+                    # Create split vector with n_columns number of slots
+                    total = len(self.columns)
+                    split = [0.0] * total
+                    share = 1.0 / zone.n_columns
+
+                    # Apply share to each active column in zone
+                    for col in cols:
+                        split[col.index] = share
 
                     evt = process.add_event(
                         f"{zone.name}_{carousel_state}",
                         f"flow_sheet.output_states.{zone.inlet_unit}",
-                        output_state,
+                        split,
                     )
                     process.add_event_dependency(
                         evt.name, "switch_time", [carousel_state]
                     )
 
-                    for col in col_indices:
+                    for col in cols:
                         evt = process.add_event(
-                            f"column_{col}_{carousel_state}",
-                            f"flow_sheet.output_states.column_{col}",
+                            f"column_{col.index}_{carousel_state}",
+                            f"flow_sheet.output_states.{col.bottom.name}",
                             i_zone,
                         )
                         process.add_event_dependency(
                             evt.name, "switch_time", [carousel_state]
                         )
 
-                for i, col in enumerate(col_indices):
+                # Set flow direction
+                for col in cols:
                     evt = process.add_event(
-                        f"column_{col}_{carousel_state}_velocity",
-                        f"flow_sheet.column_{col}.flow_direction",
+                        f"column_{col.index}_{carousel_state}_velocity",
+                        f"flow_sheet.{col.bottom.name}.flow_direction",
                         zone.flow_direction,
                     )
                     process.add_event_dependency(
@@ -493,12 +592,9 @@ class CarouselBuilder(Structure):
         return int(np.floor((t % self.cycle_time) / self.switch_time))
 
     def column_indices_at_state(
-        self,
-        carousel_positions: np.typing.NDArray[int],
-        carousel_state: int,
+        self, carousel_positions: np.typing.NDArray[int], carousel_state: int
     ) -> np.ndarray[int]:
-        """
-        Determine index of column unit at given carousel position and state.
+        """Determine index of column unit at given carousel position and state.
 
         Parameters
         ----------
@@ -521,8 +617,7 @@ class CarouselBuilder(Structure):
         t: float,
         carousel_positions: np.typing.NDArray[int],
     ) -> int:
-        """
-        Determine index of column unit at given carousel position and time.
+        """Determine index of column unit at given carousel position and time.
 
         Parameters
         ----------
@@ -544,6 +639,72 @@ class CarouselBuilder(Structure):
         )
 
         return column_indices
+    
+class SerialCarouselBuilder(CarouselBuilder):
+    """
+    Configurator for a Serial only SMB system with pipes modelled 
+    in between columns within the same serial zone.
+    """
+    def __init__(
+            self,
+            component_system: ComponentSystem,
+            name: str
+            ):
+        super().__init__(component_system, name)
+        self._pipe: TubularReactorBase | None = None
+
+    @property
+    def pipe(self) -> TubularReactorBase:
+        """Pipe template for connections between columns within a SerialZone."""
+        return self._pipe
+
+    @pipe.setter
+    def pipe(self, pipe:TubularReactorBase | None) -> NoReturn:
+        if pipe is not None and not isinstance(pipe, TubularReactorBase):
+            raise TypeError("Pipe must be an instance of TubularReactorBase or None.")
+        else:
+            self._pipe = pipe
+
+    def _find_pipe_zone_and_local_index(
+            self,
+            col_index:int
+            ) -> tuple[SerialZone,int] | None:
+        """Finds which zone a pipe belongs to."""
+        cum = 0
+        for zone in self.zones:
+            if cum <= col_index < cum + zone.n_columns:
+                return zone, col_index - cum
+            cum += zone.n_columns
+        return None
+
+    def _add_ring_connections(self, flow_sheet: FlowSheet) -> NoReturn:
+        """
+        Overrides simple add ring connections.
+        Handles optional pipe between columns within SerialZone and sets pipe
+        initial states.
+        """
+        cols = self.columns
+        adjacency = zip(cols, cols[1:] + cols[:1])
+        if self.pipe is None:
+            # Directly link col bottom -> next col top
+            # this is mainly added for compatibility
+            for this_col, next_col in adjacency:
+                flow_sheet.add_connection(this_col.bottom, next_col.top)
+        else:
+            # Insert pipe between each column pair
+            for this_col, next_col in adjacency:
+                pipe = deepcopy(self.pipe)
+                pipe.component_system = self.component_system
+                pipe.name = f'pipe_{this_col.index}_{next_col.index}'
+                flow_sheet.add_unit(pipe)
+                # Propogate initial state
+                owner = self._find_pipe_zone_and_local_index(this_col.index)
+                if owner is not None and owner[0].initial_state is not None:
+                    _, local = owner
+                    pipe.initial_state = owner[0].initial_state[local]
+
+                flow_sheet.add_connection(this_col.bottom, pipe)
+                flow_sheet.add_connection(pipe, next_col.top)
 
 
 class SMBBuilder(CarouselBuilder):
@@ -602,6 +763,8 @@ class SMBBuilder(CarouselBuilder):
 
         super().__init__(component_system, name, valve_parameters)
 
+        raffinate = Outlet(component_system, name="raffinate")
+        extract = Outlet(component_system, name="extract")
         raffinate = Outlet(component_system, name="raffinate")
         extract = Outlet(component_system, name="extract")
 
@@ -1499,6 +1662,7 @@ class CarouselSolutionBulk(SolutionBase):
     def radial_coordinates(self) -> npt.ArrayLike:
         radial_coordinates = \
             self.simulation_results.solution.column_0.bulk.radial_coordinates
+
         if radial_coordinates is not None and len(radial_coordinates) == 1:
             radial_coordinates = None
 

@@ -609,7 +609,10 @@ class Cadet(SimulatorBase):
                             sol_volume = unit_solution.solution_volume[start:end]
                             solution[unit.name]["volume"].append(
                                 SolutionVolume(
-                                    unit.name, unit.component_system, time, sol_volume
+                                    unit.name,
+                                    unit.component_system,
+                                    time,
+                                    sol_volume.flatten()
                                 )
                             )
                         start = end - 1
@@ -1354,15 +1357,16 @@ unit_parameters_map = {
             "PORE_ACCESSIBILITY": "pore_accessibility",
             "PAR_DIFFUSION": "pore_diffusion",
             "PAR_SURFDIFFUSION": "surface_diffusion",
+            'PAR_TYPE_VOLFRAC': "par_type_volfrac",
             "CROSS_SECTION_AREA": "cross_section_area",
             "VELOCITY": "flow_direction",
         },
         "fixed": {
             "COL_DISPERSION_MULTIPLEX": 3,
-            "FILM_DIFFUSION_MULTIPLEX": 3,
-            "PAR_DIFFUSION_MULTIPLEX": 3,
-            "PAR_SURFDIFFUSION_MULTIPLEX": 3,
-            "PORE_ACCESSIBILITY_MULTIPLEX": 3,
+            "FILM_DIFFUSION_MULTIPLEX": 0,
+            "PAR_DIFFUSION_MULTIPLEX": 0,
+            "PAR_SURFDIFFUSION_MULTIPLEX": 0,
+            "PORE_ACCESSIBILITY_MULTIPLEX": 0,
         },
     },
     "LumpedRateModelWithPores": {
@@ -1378,9 +1382,15 @@ unit_parameters_map = {
             "FILM_DIFFUSION": "film_diffusion",
             "PAR_POROSITY": "particle_porosity",
             "PAR_RADIUS": "particle_radius",
+            'PAR_TYPE_VOLFRAC': "par_type_volfrac",
             "PORE_ACCESSIBILITY": "pore_accessibility",
             "CROSS_SECTION_AREA": "cross_section_area",
             "VELOCITY": "flow_direction",
+        },
+        "fixed": {
+            "COL_DISPERSION_MULTIPLEX": 3,
+            "FILM_DIFFUSION_MULTIPLEX": 0,
+            "PORE_ACCESSIBILITY_MULTIPLEX": 0,
         },
         "fixed": {
             "COL_DISPERSION_MULTIPLEX": 3,

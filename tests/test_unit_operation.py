@@ -20,7 +20,8 @@ volume = cross_section_area * length
 
 bed_porosity = 0.3
 particle_porosity = 0.6
-particle_radius = 1e-4
+particle_radius = [1e-4]
+par_type_volfrac = [1]
 total_porosity = bed_porosity + (1 - bed_porosity) * particle_porosity
 const_solid_volume = volume * (1 - total_porosity)
 init_liquid_volume = volume * total_porosity
@@ -87,6 +88,7 @@ def lrmp(component_system):
     lrmp.axial_dispersion = axial_dispersion
     lrmp.bed_porosity = bed_porosity
     lrmp.particle_radius = particle_radius
+    lrmp.par_type_volfrac = par_type_volfrac
     lrmp.particle_porosity = particle_porosity
     lrmp.film_diffusion = [film_diffusion_0, film_diffusion_1]
     return lrmp
@@ -100,9 +102,11 @@ def grm(components=2):
     grm.axial_dispersion = axial_dispersion
     grm.bed_porosity = bed_porosity
     grm.particle_radius = particle_radius
+    grm.par_type_volfrac = par_type_volfrac
     grm.particle_porosity = particle_porosity
     grm.film_diffusion = [film_diffusion_0, film_diffusion_1]
     grm.pore_diffusion = [pore_diffusion_0, pore_diffusion_1]
+    grm.discretization.npar = [5]
     return grm
 
 
@@ -289,6 +293,7 @@ def test_polynomial_flow_rate(
                 "pore_accessibility": [1, 1],
                 "film_diffusion": [film_diffusion_0, film_diffusion_1],
                 "particle_radius": particle_radius,
+                "par_type_volfrac": par_type_volfrac,
                 "particle_porosity": particle_porosity,
                 "flow_direction": flow_direction,
                 "c": [0, 0],
@@ -324,6 +329,7 @@ def test_polynomial_flow_rate(
                 "pore_accessibility": [1, 1],
                 "film_diffusion": [film_diffusion_0, film_diffusion_1],
                 "particle_radius": particle_radius,
+                "par_type_volfrac": par_type_volfrac,
                 "particle_porosity": particle_porosity,
                 "pore_diffusion": [pore_diffusion_0, pore_diffusion_1],
                 "surface_diffusion": None,
@@ -334,7 +340,7 @@ def test_polynomial_flow_rate(
                 "discretization": {
                     "ncol": 100,
                     "par_geom": "SPHERE",
-                    "npar": 5,
+                    "npar": [5],
                     "par_disc_type": "EQUIDISTANT_PAR",
                     "par_boundary_order": 2,
                     "fix_zero_surface_diffusion": False,
