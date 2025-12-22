@@ -1212,6 +1212,13 @@ class FractionationSSE(DifferenceBase):
         return sse
 
 
+        # corr_der = pearson_offset(
+        #     self.reference_der.time,
+        #     self.reference_der.solution_interpolated.solutions[0],
+        #     solution.derivative.solution_interpolated.solutions[0],
+        #     offset_original,
+        # )
+
 class DerivativeRMSE(DifferenceBase):
     """Root mean squared errors (RMSE) of derivative difference metric."""
 
@@ -1219,9 +1226,9 @@ class DerivativeRMSE(DifferenceBase):
 
     def _evaluate(self, solution: SolutionBase) -> np.ndarray:
 
-        sol_der = solution.derivative
-        ref_der = self.reference.solution.derivative
-        rmse = calculate_rmse(sol_der, ref_der.solution)
+        sol_der = solution.derivative.solution
+        ref_der = self.reference.derivative.solution
+        rmse = calculate_rmse(sol_der, ref_der)
 
         return rmse
       
