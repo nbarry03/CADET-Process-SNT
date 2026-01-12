@@ -214,6 +214,7 @@ class Dask(ParallelizationBackendBase):
         """
         super().__init__(**kwargs)
 
+        self.cluster = None
         if scheduler_address is None:
             self.cluster = LocalCluster(n_workers=self._n_cores, threads_per_worker=1)
             self.client = Client(self.cluster)
@@ -222,6 +223,15 @@ class Dask(ParallelizationBackendBase):
             self.client = Client(address=scheduler_address)
             # Core management delegated to cluster config, n_cores not used
             # TODO: Add warning when n_cores != n workers cores
+
+    def close(self):
+        """Close the client connection."""
+        try:
+            self.client.close()
+        finally:
+            # Close the local cluster
+            if self.cluster is not None:
+                self.cluster.close()
 
     def evaluate(self, function: callable, population: Iterable) -> list:
         """
@@ -239,8 +249,11 @@ class Dask(ParallelizationBackendBase):
         list
             List of results of function evaluations.
         """
-        print("Evaluating")
         futures = self.client.map(function, population)
-        results = self.client.gather(futures)
-
-        return results
+        
+        try:
+            return self.client.gather(futures)
+        
+        except BaseException:
+            self.client.cancel(futures, force=True)
+            raise
